@@ -1,0 +1,9 @@
+{
+    "database_file" : "COINBASE",
+    "currency": "BTC",
+    "transactionAmt" : 1,
+    "delay" : 60,
+    "connection" :"coinbase",
+    "connectionConfig" : "config/coinbase.json",
+    "algoConfig" : "config/algo.json"
+}

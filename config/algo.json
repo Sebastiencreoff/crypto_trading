@@ -1,0 +1,10 @@
+{
+    "rollingMean" :{
+        "frequencies" : [5, 20]
+    },
+    "maxLost" :{
+        "percentage" : 10,
+        "value"   : 100
+    }
+
+}

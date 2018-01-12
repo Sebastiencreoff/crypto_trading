@@ -2,7 +2,12 @@ try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
-    
+
+[nosetests] 
+verbosity=3
+with-doctest=1
+tests = tests/, tests/connection/
+
 config = {
 'description': 'Crypto Trading project with CoinBase API',
 'author': 'Sebastien Creoff',

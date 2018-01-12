@@ -1,11 +1,6 @@
-from nose.tools import *
-import trading
-    
-def setup():
-    print "SETUP!"
-    
-def teardown():
-    print "TEAR DOWN!"
-    
-def test_basic():
-    print "I RAN!"
+import unittest
+
+import trading.algo.algoIf
+import trading.connection.connection
+import trading.trading
+
