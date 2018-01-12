@@ -1,0 +1,33 @@
+{
+    "Main" : { 
+        "user" : "user"
+        "key"  : "key"
+        "transactionFeeAmt" : 1.00,
+        "currency" : "EUR"
+    },
+    
+    "processDesc" :[
+        {
+            "currency" : "BTC",
+            "transactionAmt" : 20,
+            "maxLostAmt" : 2
+        },
+        {
+            "currency" : "BCH",
+            "transactionAmt" : 20,
+            "maxLostAmt" : 2
+            
+        },
+        {
+            "currency" : "ETH",
+            "transactionAmt" : 20,
+            "maxLostAmt" : 2
+            
+        },
+        {
+            "currency" : "LTC",
+            "transactionAmt" : 20,
+            "maxLostAmt" : 2
+        }
+    ]
+}
