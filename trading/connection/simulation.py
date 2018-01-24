@@ -1,7 +1,6 @@
-#from coinbase.wallet.client import Client
+import random
 
-
-def coinBaseConnect(Connect):
+def simulationConnect(Connect):
     """ coinBase API connection """
     
     def __init__(self, configFile = "config/coinbase.json"):
@@ -27,9 +26,18 @@ def coinBaseConnect(Connect):
         """
         super.allowCurrency(currency)
 
-        return False
 
-  
+        # price simulation
+        if currency in self.currency :
+            self.currency[currency] += random.randInt(-100,100)
+            
+            if(self.currency[currency] == 0)
+                self.currency[currency] = random.randInt(0,100)
+
+        else:
+            self.currency[currency] = random.randInt(0,100)
+
+        return self.currency[currency]
 
 
 
@@ -47,10 +55,12 @@ def coinBaseConnect(Connect):
         """
         super.allowCurrency(currency)
 
-        return False
+        feeAmt = amt * 0.01
+
+        return True, feeAmt
 
 
-    def sell_currency(self, currency='BTC', amount):
+    def sell_currency(self, currency='BTC', amt):
         """ sell currency
             :param currency: currency to sell
             :param amt: amount value
@@ -64,5 +74,5 @@ def coinBaseConnect(Connect):
         """
         super.allowCurrency(currency)
 
-        return False
+        return True
 

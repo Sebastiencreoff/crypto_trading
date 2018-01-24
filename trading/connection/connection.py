@@ -1,15 +1,29 @@
-#from coinbase.wallet.client import Client
+import abc
 
 
-def coinBaseConnect(Connect):
+def Connect(abc.ABC):
     """ coinBase API connection """
     
     def __init__(self, configFile = "config/coinbase.json"):
-        """ initialisation of all configuration needed 
-            :param configFile: configuration file
-        """
-        super().__init__()
+        """ initialisation of all configuration needed """
+        
+        self.__dict__ = json.loads(configFile)
 
+        self.currency = {}
+        self.allowCurrency = [ 'BTC', 'BCH', 'ETH', 'LTC']
+
+    def allowCurrency(self, currency = 'BTC')
+        """ check if currency is available
+            :param currency: currency value to check
+
+            :raise NameError: if currency not found
+            :exemple :
+                >>> allowCurrency(currency='BTC', refCurrency = 'EUR')
+                920
+        
+        """
+        if currency not in self.allowCurrency:
+            raise NameError (" currency : $currency not found" )
 
 
     def get_currency(self, currency='BTC', refCurrency = 'EUR'):
@@ -25,11 +39,8 @@ def coinBaseConnect(Connect):
                 920
         
         """
-        super.allowCurrency(currency)
+        pass
 
-        return False
-
-  
 
 
 
@@ -45,12 +56,10 @@ def coinBaseConnect(Connect):
                 true, 0.01
         
         """
-        super.allowCurrency(currency)
-
-        return False
+        pass
 
 
-    def sell_currency(self, currency='BTC', amount):
+    def sell_currency(self, currency='BTC', amt):
         """ sell currency
             :param currency: currency to sell
             :param amt: amount value
@@ -62,7 +71,5 @@ def coinBaseConnect(Connect):
                 true
         
         """
-        super.allowCurrency(currency)
-
-        return False
+        pass
 
