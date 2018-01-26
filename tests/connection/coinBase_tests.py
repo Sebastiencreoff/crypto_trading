@@ -1,11 +1,11 @@
 from nose.tools import *
-import coinBase
+#import coinBase
     
 def setup():
-    print "SETUP!"
+    print ("SETUP!")
     
 def teardown():
-    print "TEAR DOWN!"
+    print ("TEAR DOWN!")
     
 def test_getCurrency():
     pass

@@ -1,14 +1,15 @@
 #from coinbase.wallet.client import Client
 
+from trading.connection import connection
 
-def coinBaseConnect(Connect):
+class CoinBaseConnect(connection.Connect):
     """ coinBase API connection """
     
     def __init__(self, configFile = "config/coinbase.json"):
         """ initialisation of all configuration needed 
             :param configFile: configuration file
         """
-        super().__init__()
+        super().__init__(configFile)
 
 
 
@@ -33,7 +34,7 @@ def coinBaseConnect(Connect):
 
 
 
-    def buy_currency(self, currency='BTC', amt):
+    def buy_currency(self, currency='BTC', amt = 0):
         """ buy currency
             :param currency: currency to buy
             :param amt: amount value
@@ -50,7 +51,7 @@ def coinBaseConnect(Connect):
         return False
 
 
-    def sell_currency(self, currency='BTC', amount):
+    def sell_currency(self, currency='BTC', amount = 0):
         """ sell currency
             :param currency: currency to sell
             :param amt: amount value

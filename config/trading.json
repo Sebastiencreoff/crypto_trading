@@ -1,7 +1,7 @@
 {
     "Main" : { 
-        "user" : "user"
-        "key"  : "key"
+        "user" : "user",
+        "key"  : "key",
         "transactionFeeAmt" : 1.00,
         "currency" : "EUR"
     },

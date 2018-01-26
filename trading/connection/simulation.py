@@ -1,13 +1,15 @@
 import random
 
-def simulationConnect(Connect):
+from trading.connection import connection
+
+class SimulationConnect(connection.Connect):
     """ coinBase API connection """
     
     def __init__(self, configFile = "config/coinbase.json"):
         """ initialisation of all configuration needed 
             :param configFile: configuration file
         """
-        super().__init__()
+        super().__init__(configFile)
 
 
 
@@ -31,7 +33,7 @@ def simulationConnect(Connect):
         if currency in self.currency :
             self.currency[currency] += random.randInt(-100,100)
             
-            if(self.currency[currency] == 0)
+            if self.currency[currency] == 0 :
                 self.currency[currency] = random.randInt(0,100)
 
         else:
@@ -41,7 +43,7 @@ def simulationConnect(Connect):
 
 
 
-    def buy_currency(self, currency='BTC', amt):
+    def buy_currency(self, currency='BTC', amt = 0):
         """ buy currency
             :param currency: currency to buy
             :param amt: amount value
@@ -60,7 +62,7 @@ def simulationConnect(Connect):
         return True, feeAmt
 
 
-    def sell_currency(self, currency='BTC', amt):
+    def sell_currency(self, currency='BTC', amt = 0):
         """ sell currency
             :param currency: currency to sell
             :param amt: amount value

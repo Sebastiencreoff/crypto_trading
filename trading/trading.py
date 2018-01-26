@@ -13,7 +13,7 @@ def Trading(object):
         
         self.loop = 1
         
-    def start(self):
+    def run(self):
         """ launch the trading process, which will contain:
                 - 1 thread for data acquisition
                 - 1 thread by currency to deal with

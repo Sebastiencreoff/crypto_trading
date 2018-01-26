@@ -1,18 +1,22 @@
 from nose.tools import *
-import connection.simulation
+import unittest
+
+from trading.connection import simulation
 
 
-def   simulationConnect_test(unittest.TestCase) :
+class simulationConnect_test(unittest.TestCase) :
     
-    def setup():
-        print "SETUP!"
-        simulationConnect connect ("config/coinbase.json")
+    def setup(self):
+        print ("SETUP!")
+        
     
-    def teardown():
-        print "TEAR DOWN!"
+    def teardown(self):
+        print ("TEAR DOWN!")
     
-    def test_unknownCurrency():
+    def test_unknownCurrency(self):
     
+        connect = simulation.SimulationConnect("")
+
         with self.assertRaises(NameError):
             connect.get_currency(   currency = 'Unknown Currency')
 
@@ -23,7 +27,10 @@ def   simulationConnect_test(unittest.TestCase) :
             connect.sell_currency(  currency = 'Unknown Currency', amt = 10)
 
 
-    def test_execute():
+    def test_execute(self):
+
+        connect = simulation.SimulationConnect("")
+
         currencyValue = connect.get_currency(   currency = 'ETH')
 
         self.assertTrue(currencyValue <= 100 and currencyValue >= 0)
@@ -31,7 +38,5 @@ def   simulationConnect_test(unittest.TestCase) :
         self.assertEqual(connect.buy_currency(   currency = 'ETH', amt = 10), [ True, 0.1 ])
         self.assertEqual(connect.sell_currency(  currency = 'ETH', amt = 10), [ True])
     
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
