@@ -10,7 +10,7 @@ class Connect(abc.ABC):
     def __init__(self, configFile = "config/coinbase.json"):
         """ initialisation of all configuration needed """
         
-        os.path.isfile(configFile) 
+        assert os.path.isfile(configFile)
 
         self.__dict__ = json.loads(configFile)
 
@@ -77,4 +77,6 @@ class Connect(abc.ABC):
         
         """
         pass
+
+
 
