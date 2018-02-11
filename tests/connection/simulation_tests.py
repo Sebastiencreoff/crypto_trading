@@ -15,7 +15,7 @@ class simulationConnect_test(unittest.TestCase) :
     
     def test_unknownCurrency(self):
     
-        connect = simulation.SimulationConnect("")
+        connect = simulation.SimulationConnect("config/trading.json")
 
         with self.assertRaises(NameError):
             connect.get_currency(   currency = 'Unknown Currency')
