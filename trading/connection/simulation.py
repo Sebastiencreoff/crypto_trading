@@ -5,7 +5,7 @@ from trading.connection import connection
 class SimulationConnect(connection.Connect):
     """ coinBase API connection """
     
-    def __init__(self, configFile = "config/coinbase.json"):
+    def __init__(self, configFile):
         """ initialisation of all configuration needed 
             :param configFile: configuration file
         """
@@ -26,18 +26,18 @@ class SimulationConnect(connection.Connect):
                 920
         
         """
-        super.allowCurrency(currency)
+        super().allowCurrency(currency)
 
 
         # price simulation
         if currency in self.currency :
-            self.currency[currency] += random.randInt(-100,100)
+            self.currency[currency] += random.randint(-100,100)
             
             if self.currency[currency] == 0 :
-                self.currency[currency] = random.randInt(0,100)
+                self.currency[currency] = random.randint(0,100)
 
         else:
-            self.currency[currency] = random.randInt(0,100)
+            self.currency[currency] = random.randint(0,100)
 
         return self.currency[currency]
 
@@ -55,7 +55,7 @@ class SimulationConnect(connection.Connect):
                 true, 0.01
         
         """
-        super.allowCurrency(currency)
+        super().allowCurrency(currency)
 
         feeAmt = amt * 0.01
 
@@ -74,7 +74,7 @@ class SimulationConnect(connection.Connect):
                 true
         
         """
-        super.allowCurrency(currency)
+        super().allowCurrency(currency)
 
         return True
 

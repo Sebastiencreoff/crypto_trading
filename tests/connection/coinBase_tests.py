@@ -7,12 +7,17 @@ def setup():
 def teardown():
     print ("TEAR DOWN!")
     
-def test_getCurrency():
-    pass
+from nose.tools import *
+import unittest
+
+class CoinBaseConnect_test(unittest.TestCase) :
+    
+    def test_getCurrency(self):
+        pass
 
 
-def test_buyCurrency():
-    pass
+    def test_buyCurrency(self):
+        pass
 
-def test_sellCurrency():
-    pass
+    def test_sellCurrency(self):
+        pass

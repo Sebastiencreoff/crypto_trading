@@ -7,15 +7,21 @@ import os.path
 class Connect(abc.ABC):
     """ coinBase API connection """
     
-    def __init__(self, configFile = "config/coinbase.json"):
-        """ initialisation of all configuration needed """
+    def __init__(self, configFile):
+        """ initialisation of all configuration needed 
         
-        assert os.path.isfile(configFile)
+        try:
+            assert os.path.isfile(configFile)
 
-        self.__dict__ = json.loads(configFile)
+            self.__dict__ = json.loads(configFile)
+
+        except ValueError:  # includes simplejson.decoder.JSONDecodeError
+            print ("Decoding JSON has failed", configFile )
+            raise
+        """
 
         self.currency = {}
-        self.allowCurrency = [ 'BTC', 'BCH', 'ETH', 'LTC']
+        self.allowCurrencies = [ 'BTC', 'BCH', 'ETH', 'LTC']
 
     def allowCurrency(self, currency = 'BTC'):
         """ check if currency is available
@@ -27,7 +33,7 @@ class Connect(abc.ABC):
                 920
         
         """
-        if currency not in self.allowCurrency:
+        if currency not in self.allowCurrencies:
             raise NameError (" currency : $currency not found" )
 
 

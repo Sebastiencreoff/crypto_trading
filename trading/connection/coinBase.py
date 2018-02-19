@@ -1,11 +1,12 @@
 #from coinbase.wallet.client import Client
 
 from trading.connection import connection
+from coinbase.wallet.client import Client
 
 class CoinBaseConnect(connection.Connect):
     """ coinBase API connection """
     
-    def __init__(self, configFile = "config/coinbase.json"):
+    def __init__(self, configFile = "config/connection.json"):
         """ initialisation of all configuration needed 
             :param configFile: configuration file
         """
