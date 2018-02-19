@@ -6,6 +6,7 @@ except ImportError:
 [nosetests] 
 verbosity=3
 with-doctest=1
+tests = tests/, tests/connection/
 
 config = {
 'description': 'Crypto Trading project with CoinBase API',
