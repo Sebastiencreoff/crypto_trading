@@ -29,10 +29,6 @@ def Trading(object):
             
         
         
-        
-        
-        
-        
     def stop(self):
         """ stop trading """
         
