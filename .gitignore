@@ -27,6 +27,9 @@ wheels/
 
 #visual studio code
 vsc
+.vscode-upload.json
+vsc.code-workspace
+
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
