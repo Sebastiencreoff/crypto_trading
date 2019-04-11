@@ -1,6 +1,9 @@
 {
-    "rollingMean" :{
-        "frequencies" : [5, 20]
+    "GuppyMMA" : {
+        "short_term" : [3, 5, 8, 10, 12, 15],
+        "long_term" : [30, 35, 40, 45, 50, 60],
+        "buy" : 6,
+        "sell" : 6
     },
     "maxLost" :{
         "percentage" : 10,

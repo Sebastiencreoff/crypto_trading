@@ -54,11 +54,15 @@ class SimulationConnect(trading.connection.connection.Connect):
                 0.2, 0.01
         """
         fee_amount = amount * 0.01
-        logging.warning('success currency: %s amount: %d, fee_amount: %d',
+        logging.warning('success currency: %s '
+                        'amount: %s/%s (%s in EUR) '
+                        'fee_amount: %s',
+                        currency,
+                        amount/self.value,
+                        amount,
                         self.value,
-                        amount*self.value,
-                        fee_amount*self.value)
-        return amount*self.value, fee_amount
+                        fee_amount)
+        return amount/self.value, fee_amount
 
     def sell(self, amount, currency, currency_value):
         """Sell currency, currency is defined at class initialisation.
@@ -66,17 +70,21 @@ class SimulationConnect(trading.connection.connection.Connect):
             :param amount: amount value in currency
             :param currency: currency to sell
             :param currency_value: current currency value.
-            :return : amount sell in Eur, fee amount in Eur or None,None
+            :return : currency_value bought and fee amount or None, None
 
             :example :
                 >>> sell(amount=0.1, currency='BTC')
                 10.1, 0.1
         """
-
-        fee_amount = amount * 0.01
-        logging.warning('success currency: %s amount: %d, fee_amount: %d',
+        fee_amount = amount * self.value * 0.01
+        logging.warning('success currency: %s '
+                        'amount: %s/%s (%s in %s),'
+                        'fee_amount: %s',
+                        currency,
+                        amount,
+                        amount * self.value,
                         self.value,
-                        amount*self.value,
-                        fee_amount*self.value)
-        return amount*self.value, fee_amount
+                        currency,
+                        fee_amount)
+        return self.value, fee_amount
 

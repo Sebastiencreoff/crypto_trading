@@ -4,8 +4,6 @@
 class Connect(object):
     """Connect API connection."""
 
-    allow_currencies = ['BTC', 'BCH', 'ETH', 'LTC']
-
     def __init__(self, config_dict):
         """Initialisation of all configuration needed.
 

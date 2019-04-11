@@ -66,15 +66,16 @@ class Trading(threading.Thread):
                 result = self.algo_if.process(currency_value)
                 if trans.buy_date_time:
                     if (result < 0
-                        or self.security.process(trans.currency_buy_value,
-                                                 currency_value)):
-                        trans.save_sell(self.connect.sell(
-                            trans.currency_buy_value, trans.currency,
+                        or self.security.process(
+                                trans.buy_value,
+                                currency_value * trans.currency_buy_amt)):
+                        trans.save_sell(*self.connect.sell(
+                            trans.currency_buy_amt, trans.currency,
                             currency_value))
                         trans = None
 
                 elif result > 0:
-                    trans = trans.save_buy(self.connect.buy(
+                    trans = trans.save_buy(*self.connect.buy(
                         trans.buy_value, trans.currency, currency_value))
 
             time.sleep(cfg.conf.delay)

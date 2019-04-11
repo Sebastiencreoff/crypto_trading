@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import sqlobject
@@ -20,8 +21,7 @@ def get_last_values(currency, count=None):
     ).orderBy(Pricing.q.date_time)
 
     if count:
-        pricing = pricing[0:count]
-
+        pricing = pricing[-count:]
     return [x.value for x in pricing]
 
 
@@ -37,7 +37,7 @@ class Pricing(sqlobject.SQLObject):
 
     DATE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
-    date_time = sqlobject.col.DateTimeCol(default=None)
+    date_time = sqlobject.col.DateTimeCol(default=datetime.datetime.now())
     value = sqlobject.col.FloatCol()
     currency = sqlobject.col.StringCol()
 

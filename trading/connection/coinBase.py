@@ -1,6 +1,8 @@
+import functools
 import json
 import logging
 import os.path
+import requests
 
 import coinbase.wallet.client
 
@@ -9,9 +11,26 @@ import trading.connection.connection
 REF_CURRENCY = 'EUR'
 
 
+def manage_exception(func):
+    @functools.wraps(func)
+    def wrapper(*args):
+        stop = True
+
+        while stop:
+            try:
+                return func(*args)
+            except coinbase.wallet.errors.CoinbaseError as e:
+                logging.critical('Coinbase error: {}'.format(e))
+                raise e
+            except requests.exception.RequestException as e:
+                logging.warning('Exception error: {}'.format(e))
+
+    return wrapper
+
+
 class CoinBaseConnect(trading.connection.connection.Connect):
     """coinBase API connection."""
-    
+
     def __init__(self, config_dict):
         """Initialisation of all configuration needed.
 
@@ -40,7 +59,7 @@ class CoinBaseConnect(trading.connection.connection.Connect):
         self.payment_method = None
 
         logging.debug('coinbase payment_method: %s',
-                      self.client.get_payment_methods())
+                        self.client.get_payment_methods())
 
         for payment_method in self.client.get_payment_methods().data:
             if payment_method['type'] == 'fiat_account':
@@ -61,6 +80,7 @@ class CoinBaseConnect(trading.connection.connection.Connect):
         logging.critical('account not found for currency: %s', currency)
         raise NameError('Invalid currency')
 
+    @manage_exception
     def get_value(self, currency=None):
         """Get currencies from coinBase in EUR.
 
@@ -78,10 +98,11 @@ class CoinBaseConnect(trading.connection.connection.Connect):
         if isinstance(rates, dict):
             logging.info('%s', rates['rates'][REF_CURRENCY])
             return float(rates['rates'][REF_CURRENCY])
-        
+
         logging.error('error in response')
         return None
 
+    @manage_exception
     def buy(self, amount, currency, currency_value):
         """Buy currency in EUR, currency is defined at class initialisation.
 
@@ -93,30 +114,26 @@ class CoinBaseConnect(trading.connection.connection.Connect):
             >>> buy_currency(amount=10)
                 0.2, 0.01
         """
-        try:
-            buy = self.client.buy(self._get_account_id(currency).id,
-                                  amount=amount,
-                                  currency=REF_CURRENCY,
-                                  payment_method=self.payment_method.id,
-                                  quote=self.simulation)
+        buy = self.client.buy(self._get_account_id(currency).id,
+                              amount=amount,
+                              currency=REF_CURRENCY,
+                              payment_method=self.payment_method.id,
+                              quote=self.simulation)
 
-        except coinbase.wallet.errors.CoinbaseError as e:
-            logging.critical('Buy error: {}'.format(e))
-        else:
-            logging.debug('response: %s', buy)
+        logging.debug('response: %s', buy)
 
-            logging.warning('success currency: %s '
-                            'amount: %s/%s (%s in %s) '
-                            'fee_amount: %s',
-                            currency,
-                            buy.amount.amount,
-                            buy.subtotal.amount,
-                            currency_value,
-                            REF_CURRENCY,
-                            buy.fee.amount)
-            return float(buy.amount.amount), float(buy.fee.amount)
-        return None, None
+        logging.warning('success currency: %s '
+                        'amount: %s/%s (%s in %s) '
+                        'fee_amount: %s',
+                        currency,
+                        buy.amount.amount,
+                        buy.subtotal.amount,
+                        currency_value,
+                        REF_CURRENCY,
+                        buy.fee.amount)
+        return float(buy.amount.amount), float(buy.fee.amount)
 
+    @manage_exception
     def sell(self, amount, currency, currency_value):
         """Sell currency, currency is defined at class initialisation.
 
@@ -129,27 +146,21 @@ class CoinBaseConnect(trading.connection.connection.Connect):
                 >>> sell(amount=0.1, currency='BTC')
                 10.1, 0.1
         """
+        sell = self.client.sell(self._get_account_id(currency).id,
+                                amount=amount,
+                                currency=currency,
+                                payment_method=self.payment_method.id,
+                                quote=self.simulation)
 
-        try:
-            sell = self.client.sell(self._get_account_id(currency).id,
-                                    amount=amount,
-                                    currency=currency,
-                                    payment_method=self.payment_method.id,
-                                    quote=self.simulation)
+        logging.debug('response: %s', sell)
 
-        except coinbase.wallet.errors.CoinbaseError as e:
-            logging.critical('Sell error: {}'.format(e))
-        else:
-            logging.debug('response: %s', sell)
-
-            logging.warning('success currency: %s '
-                            'amount: %s/%s (%s in %s),'
-                            'fee_amount: %s',
-                            currency,
-                            sell.amount.amount,
-                            sell.subtotal.amount,
-                            currency_value,
-                            REF_CURRENCY,
-                            sell.fee.amount)
-            return float(sell.subtotal.amount), float(sell.fee.amount)
-        return None, None
+        logging.warning('success currency: %s '
+                        'amount: %s/%s (%s in %s),'
+                        'fee_amount: %s',
+                        currency,
+                        sell.amount.amount,
+                        sell.subtotal.amount,
+                        currency_value,
+                        REF_CURRENCY,
+                        sell.fee.amount)
+        return currency_value, float(sell.fee.amount)

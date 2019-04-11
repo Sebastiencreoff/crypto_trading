@@ -28,7 +28,7 @@ def get_last_values(currency, frequency, count=None):
     ).orderBy(RollingMeanPricing.q.date_time)
 
     if count:
-        pricing = pricing[0:count]
+        pricing = pricing[-count:]
     return [x.value for x in pricing]
 
 
