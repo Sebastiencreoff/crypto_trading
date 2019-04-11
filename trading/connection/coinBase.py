@@ -12,10 +12,9 @@ REF_CURRENCY = 'EUR'
 class CoinBaseConnect(trading.connection.connection.Connect):
     """coinBase API connection."""
     
-    def __init__(self,  currency, config_dict):
+    def __init__(self, config_dict):
         """Initialisation of all configuration needed.
 
-        :param currency:   currency to deal with ( BTC, etc...)
         :param config_dict: configuration dictionary for connection
 
         configuration example:
@@ -52,63 +51,50 @@ class CoinBaseConnect(trading.connection.connection.Connect):
             raise NameError('Only fiat_account is accepted')
 
         logging.info('coinbase payment_method id: %s', self.payment_method.id)
+        super().__init__(config_dict)
 
-        # Get account currency
-        self.account = None
-
-        logging.debug('coinbase client accounts: %s',
-                      self.client.get_accounts())
-
+    def _get_account_id(self, currency):
         for account in self.client.get_accounts().data:
             if account['currency'] == currency:
-                self.account = account
+                return account
 
-        if not self.account:
-            logging.critical('account not found for currency: %s', currency)
-            raise NameError('Invalid currency')
+        logging.critical('account not found for currency: %s', currency)
+        raise NameError('Invalid currency')
 
-        logging.debug('coinbase account: %s', self.account)
-        super().__init__(currency, config_dict)
+    def get_value(self, currency=None):
+        """Get currencies from coinBase in EUR.
 
-    def get_currency(self, ref_currency='EUR'):
-        """Get currencies from coinBase in refCurrency.
-
-            :param ref_currency: value to get
+            :param currency: currency value to get
 
             :return : value of the currency
 
             :raise NameError: if currency not found
             :example :
-                >>> get_currency(ref_currency='EUR')
+                >>> get_currency(currency='BTC')
                 920
         """
-
-        rates = self.client.get_exchange_rates(currency=self.currency)
+        rates = self.client.get_exchange_rates(currency=currency)
 
         if isinstance(rates, dict):
-            logging.info('%s', rates['rates'][ref_currency])
-            return float(rates['rates'][ref_currency])
+            logging.info('%s', rates['rates'][REF_CURRENCY])
+            return float(rates['rates'][REF_CURRENCY])
         
         logging.error('error in response')
         return None
 
-    def buy_currency(self, amount=0, currency_value=0):
-        """Buy currency, currency is defined at class initialisation.
+    def buy(self, amount, currency, currency_value):
+        """Buy currency in EUR, currency is defined at class initialisation.
 
             :param amount: amount value
-            :return : boolean which indicate if it succeed,
-                      feeAmt ( set to 0 if failed)
+            :param currency: currency to buy
+            :param currency_value: current currency value.
+            :return : currency_value bought and fee amount.
             :example :
             >>> buy_currency(amount=10)
-                true, 0.01
+                0.2, 0.01
         """
- 
-        if self.database.get_current_transaction() is not None:
-            logging.error('another transaction is already processing')
-            return None  
-
         try:
-            buy = self.client.buy(self.account.id,
+            buy = self.client.buy(self._get_account_id(currency).id,
                                   amount=amount,
                                   currency=REF_CURRENCY,
                                   payment_method=self.payment_method.id,
@@ -122,34 +108,32 @@ class CoinBaseConnect(trading.connection.connection.Connect):
             logging.warning('success currency: %s '
                             'amount: %s/%s (%s in %s) '
                             'fee_amount: %s',
-                            self.currency,
+                            currency,
                             buy.amount.amount,
                             buy.subtotal.amount,
                             currency_value,
                             REF_CURRENCY,
                             buy.fee.amount)
+            return float(buy.amount.amount), float(buy.fee.amount)
+        return None, None
 
-            self.database.buy(currency_value,
-                              buy.amount.amount,
-                              buy.fee.amount)
-            return buy
-        return None
-
-    def sell_currency(self, transaction, currency_value=0):
+    def sell(self, amount, currency, currency_value):
         """Sell currency, currency is defined at class initialisation.
 
-            :param transaction: transaction
-            :return : boolean which indicate if it succeed,
+            :param amount: amount value in currency
+            :param currency: currency to sell
+            :param currency_value: current currency value.
+            :return : amount sell in Eur, fee amount in Eur
 
             :example :
-                >>> sell_currency(amount=10)
-                true
+                >>> sell(amount=0.1, currency='BTC')
+                10.1, 0.1
         """
 
         try:
-            sell = self.client.sell(self.account.id,
-                                    amount=transaction.buy_value,
-                                    currency=self.currency,
+            sell = self.client.sell(self._get_account_id(currency).id,
+                                    amount=amount,
+                                    currency=currency,
                                     payment_method=self.payment_method.id,
                                     quote=self.simulation)
 
@@ -157,19 +141,15 @@ class CoinBaseConnect(trading.connection.connection.Connect):
             logging.critical('Sell error: {}'.format(e))
         else:
             logging.debug('response: %s', sell)
-            gain = self.database.sell(transaction,
-                                      currency_value,
-                                      sell.fee.amount)
 
             logging.warning('success currency: %s '
                             'amount: %s/%s (%s in %s),'
-                            'fee_amount: %s, gain: %s',
-                            self.currency,
+                            'fee_amount: %s',
+                            currency,
                             sell.amount.amount,
                             sell.subtotal.amount,
                             currency_value,
                             REF_CURRENCY,
-                            sell.fee.amount,
-                            gain)
-            return True
-        return False
+                            sell.fee.amount)
+            return float(sell.subtotal.amount), float(sell.fee.amount)
+        return None, None

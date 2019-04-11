@@ -3,7 +3,11 @@
 
 import json
 import logging
+import os
 import sys
+
+import sqlobject
+
 
 conf = None
 
@@ -24,11 +28,21 @@ class Config:
             # Database  name
             self.pricing = 'Pricing'
 
-        except KeyError as e:
+        except KeyError:
             logging.exception('error in configuration file')
+
+    def setup_db(self):
+        sqlobject.sqlhub.processConnection = \
+            sqlobject.dbconnection.connectionForURI(
+                'sqlite:{}'.format(os.path.abspath(self.database_file)))
 
 
 def init(config_file):
 
     global conf
     conf = Config(config_file)
+    conf.setup_db()
+
+
+
+

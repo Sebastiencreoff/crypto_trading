@@ -1,6 +1,4 @@
-import abc
-
-import trading.connection.dbtransaction
+#! /usr/bin/env python
 
 
 class Connect(object):
@@ -8,17 +6,12 @@ class Connect(object):
 
     allow_currencies = ['BTC', 'BCH', 'ETH', 'LTC']
 
-    def __init__(self, currency, config_dict):
+    def __init__(self, config_dict):
         """Initialisation of all configuration needed.
 
             :param currency:   currency to deal with ( BTC, etc...)
             :param config_dict: configuration dictionary for connection
         """
-
-        self.currency = currency
-
-        self.database = trading.connection.dbtransaction.DbTransaction(
-            currency=currency)
 
     def allow_currency(self, currency='BTC'):
         """Check if currency is available.
@@ -29,13 +22,11 @@ class Connect(object):
                 >>> allow_currency(currency='BTC')
                 920
         """
-        import pdb
-        pdb.set_trace()
         if currency not in self.allow_currencies:
             raise NameError('Currency: {} not in {}'.format(
                 currency, self.allow_currencies))
 
-    def get_currency(self, ref_currency='EUR'):
+    def get_value(self, currency=None):
         """Get currencies from coinBase in refCurrency.
 
             :param ref_currency: reference value
@@ -47,47 +38,29 @@ class Connect(object):
         """
         pass
 
-    def buy_currency(self, amount=0):
-        """Buy currency, currency is defined at class initialisation.
+    def buy(self, amount, currency, currency_value):
+        """Buy currency in EUR, currency is defined at class initialisation.
 
-            :param amount: amount value in the currency
-
-            :return : boolean which indicate if it succeed,
-                      feeAmt ( set to None if failed)
+            :param amount: amount value
+            :param currency: currency to buy
+            :param currency_value: current currency value.
+            :return : currency_value bought and fee amount.
             :example :
-                >>> buy_currency(amount=10)
-                true, 0.01
+            >>> buy(amount=10)
+                0.2, 0.01
         """
         pass
 
-    def sell_currency(self,  currency_amt=0):
-        """Sell a currency amount, currency is defined at class initialisation.
+    def sell(self, amount, currency, currency_value):
+        """Sell currency, currency is defined at class initialisation.
 
-            :param currency_amt: amount value
-            :return : boolean which indicate if it succeed,
+            :param amount: amount value in currency
+            :param currency: currency to sell
+            :param currency_value: current currency value.
+            :return : amount sell in Eur, fee amount in Eur or None,None
 
             :example :
-                >>> sell_currency(currency_amt=10)
-                true
+                >>> sell(amount=0.1, currency='BTC')
+                10.1, 0.1
         """
         pass
-
-    def reset(self):
-        """Reset database.
-
-            :example :
-                >>> reset()
-        """
-        self.database.reset()
-
-    def in_progress(self):
-        """Transaction in progress.
-
-            :example :
-                >>> in_progress()
-                true
-        """
-        return self.database.get_current_transaction() is not None
-
-    def current_transaction(self):
-        return self.database.get_current_transaction()

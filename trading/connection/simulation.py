@@ -16,78 +16,67 @@ class SimulationConnect(trading.connection.connection.Connect):
             empty file
         """
         logging.info('SimulationConnect::building')
-        super().__init__('SIMU', config_dict)
+        super().__init__(config_dict)
 
-        self.currency = 0
+        self.value = 0
 
-    def get_currency(self, ref_currency='EUR'):
+    def get_value(self, currency=None):
         """Get currencies from coinBase in refCurrency.
 
-            :param ref_currency: reference value
+            :param currency: currency
             :return : value of the currency
 
             :raise NameError: if currency not found
             :example :
-                >>> get_currency(ref_currency='EUR')
+                >>> get_currency(currency='EUR')
                 920
         
         """
         # price simulation
-        self.currency += random.randint(-100, 100)
+        self.value += random.randint(-100, 100)
             
-        if self.currency <= 0:
-            self.currency = random.randint(0, 100)
+        if self.value <= 0:
+            self.value = random.randint(0, 100)
 
-        logging.info('response: %s', self.currency)
+        logging.info('response: %s', self.value)
            
-        return self.currency
+        return self.value
 
-    def buy_currency(self, amount=0):
-        """Buy currency.
-
-            :param amount: amount value
-            :return : boolean which indicate if it succeed,
-                      feeAmt ( set to 0 if failed)
-            :example :
-                >>> buy_currency(amount=10)
-                0.01 or None
-        """
-        if self.database.get_current_transaction() is None:
-            fee_amount = amount * 0.01
-            self.database.buy(amount, amount*self.currency,
-                              fee_amount*self.currency)
-            logging.warning('success currency: %s amount: %d, fee_amount: %d',
-                         self.currency,
-                         amount*self.currency,
-                         fee_amount*self.currency)
-            return fee_amount
-
-        logging.error('another transaction is already processing')
-        return None
-
-    def sell_currency(self, amount=0):
-        """Sell currency.
+    def buy(self, amount, currency, currency_value):
+        """Buy currency in EUR, currency is defined at class initialisation.
 
             :param amount: amount value
-            :return : boolean which indicate if it succeed,
+            :param currency: currency to buy
+            :param currency_value: current currency value.
+            :return : currency_value bought and fee amount.
+            :example :
+            >>> buy_currency(amount=10)
+                0.2, 0.01
+        """
+        fee_amount = amount * 0.01
+        logging.warning('success currency: %s amount: %d, fee_amount: %d',
+                        self.value,
+                        amount*self.value,
+                        fee_amount*self.value)
+        return amount*self.value, fee_amount
+
+    def sell(self, amount, currency, currency_value):
+        """Sell currency, currency is defined at class initialisation.
+
+            :param amount: amount value in currency
+            :param currency: currency to sell
+            :param currency_value: current currency value.
+            :return : amount sell in Eur, fee amount in Eur or None,None
 
             :example :
-                >>> sell_currency(amount=10)
-                true
+                >>> sell(amount=0.1, currency='BTC')
+                10.1, 0.1
         """
 
-        transaction = self.database.get_current_transaction()
-        if transaction is not None:
-            logging.warning('success currency: %s amount: %d, gain: %d',
-                            self.currency,
-                            amount*self.currency,
-                            amount * self.currency
-                            - transaction.buy_value
-                            - transaction.buy_value_fee)
-            
-            return self.database.sell(transaction.buy_date_time,
-                                      amount*self.currency)
-        else:
-            logging.error('no transaction is already processing')
-            return None
+        fee_amount = amount * 0.01
+        logging.warning('success currency: %s amount: %d, fee_amount: %d',
+                        self.value,
+                        amount*self.value,
+                        fee_amount*self.value)
+        return amount*self.value, fee_amount
 

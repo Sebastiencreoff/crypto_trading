@@ -4,8 +4,9 @@ import datetime
 import json
 import logging
 
-import trading.algo.dbValue
+import trading.algo.model as model
 import trading.algo.rollingMean
+import trading.config as cfg
 
 
 class AlgoMain:
@@ -15,25 +16,23 @@ class AlgoMain:
         """Class Initialisation."""
 
         self.__dict__ = json.load(open(config_dict, mode='r'))
-        self.db = trading.algo.dbValue.DbValue(trading.config.conf.pricing)
-
         self.algo_ifs = []
-        self.algo_ifs.append(trading.algo.rollingMean.RollingMean(
-            config_dict, self.db))
+        self.algo_ifs.append(trading.algo.rollingMean.RollingMean(config_dict))
 
-    def process(self, data_value):
+        model.create()
+
+    def process(self, currency_value):
         """Process data, it returned 1 to buy and -1 to sell."""
 
         # Price data
-
-        self.db.insert_value(datetime.datetime.now(), data_value)
-
+        model.pricing.Pricing(currency=cfg.conf.currency,
+                        date_time=datetime.datetime.now(),
+                        value=currency_value)
         result = 0
         for algo in self.algo_ifs:
-            result = result + algo.process(data_value)
+            result += algo.process(currency_value)
 
-        if result:
-            logging.warning('result: %d', result)
+        logging.info('result: %d', result)
 
         return result
 

@@ -14,6 +14,6 @@ def database_query(function):
             return function(*args, **kwargs)
         except sqlite3.Error as e:
             logging.error('SQL Query Error "%s" (%s on %s)',
-                           args[0].query, e.args[0], args[0].db_file)
+                          args[0].query, e.args[0], args[0].db_file)
             raise
     return wrapper

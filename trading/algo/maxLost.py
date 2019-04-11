@@ -26,7 +26,8 @@ class MaxLost(object):
                     and (current_value / buy_value) * 100 > self.percentage):
 
                 logging.error('SELL: Current Percentage {} upper than '
-                              'max allowed {}'.format(current_value, self.percentage))
+                              'max allowed {}'.format(
+                                current_value, self.percentage))
                 return True
 
             if self.value and buy_value - current_value > self.value:

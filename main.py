@@ -58,7 +58,7 @@ def main(argv):
     trading.config.init(config_file)
 
     # Create new threads
-    thread1 = trading.trading.Trading(config_file)
+    thread1 = trading.trading.Trading()
 
     print("Starting Trading")
     try:
@@ -69,7 +69,7 @@ def main(argv):
 
         print("\nTrading Finished!")
 
-    print ("Exiting Main Thread")
+    print("Exiting Main Thread")
 
 
 if __name__ == '__main__':
