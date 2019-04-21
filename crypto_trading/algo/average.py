@@ -1,8 +1,8 @@
 import json
 import logging
 
-import trading.algo.model as model
-import trading.config as cfg
+from . import model
+import crypto_trading.config as cfg
 
 
 class GuppyMMA(object):
@@ -37,8 +37,7 @@ class GuppyMMA(object):
         logging.info('mean with a frequencies %s',
                      self.short_terms  + self.long_terms)
 
-    def process_freq(self, frequencies):
-        currency = cfg.conf.currency
+    def process_freq(self, frequencies, currency):
         real_values = model.pricing.get_last_values(count=self.max_frequencies,
                                                     currency=currency)
 
@@ -62,12 +61,14 @@ class GuppyMMA(object):
 
         return min_val, max_val, values
 
-    def process(self, data_value):
+    def process(self, data_value, currency):
         """Process data, it returned 1 to buy and -1 to sell."""
         logging.debug('')
 
-        short_min, short_max, short_values = self.process_freq(self.short_terms)
-        long_min, long_max, long_values = self.process_freq(self.long_terms)
+        short_min, short_max, short_values = self.process_freq(
+            self.short_terms, currency)
+        long_min, long_max, long_values = self.process_freq(
+            self.long_terms, currency)
 
         count = 0
         if long_max:
@@ -79,9 +80,9 @@ class GuppyMMA(object):
 
         previous_guppy = model.guppy_mma.get_last_values(
             count=1,
-            currency=cfg.conf.currency)
+            currency=currency)
 
-        guppy = model.guppy_mma.Guppy(count=count, currency=cfg.conf.currency)
+        guppy = model.guppy_mma.Guppy(count=count, currency=currency)
         logging.debug('Guppy count: {}'.format(guppy.count))
 
         if not len(previous_guppy):

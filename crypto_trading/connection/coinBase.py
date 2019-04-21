@@ -6,7 +6,7 @@ import requests
 
 import coinbase.wallet.client
 
-import trading.connection.connection
+from . import connection
 
 REF_CURRENCY = 'EUR'
 
@@ -28,7 +28,7 @@ def manage_exception(func):
     return wrapper
 
 
-class CoinBaseConnect(trading.connection.connection.Connect):
+class CoinBaseConnect(connection.Connect):
     """coinBase API connection."""
 
     def __init__(self, config_dict):
@@ -46,7 +46,6 @@ class CoinBaseConnect(trading.connection.connection.Connect):
 
         """
         logging.info('')
-
         assert os.path.isfile(config_dict)
         self.__dict__ = json.load(open(config_dict, mode='r'))
         self.simulation = self.__dict__.get('simulation', True)

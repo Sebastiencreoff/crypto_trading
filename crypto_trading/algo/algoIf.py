@@ -4,6 +4,6 @@
 class AlgoIf:
     """Super class to manage data."""
 
-    def process(self, data_value):
+    def process(self, data_value, currency):
         """Process data, it returned 1 to buy and -1 to sell."""
         pass

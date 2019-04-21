@@ -5,36 +5,37 @@ import logging
 import time
 import threading
 
-import trading.algo.algoMain
-import trading.algo.maxLost
-import trading.config as cfg
-import trading.connection.simulation
-import trading.connection.coinBase
-import trading.model
+from . import algo
+from . import config as cfg
+from . import connection
+from . import model
 
 
 class Trading(threading.Thread):
     """Trading process."""
     
-    def __init__(self):
+    def __init__(self, config_file):
         """Initialisation of all configuration needed."""
+
+        # Load global configuration
+        self.conf = cfg.init(config_file)
 
         self.loop = 1
 
         # Connection
         self.connect = None 
-        if cfg.conf.connection == 'coinbase':
-            self.connect = trading.connection.coinBase.CoinBaseConnect(
-                cfg.conf.connection_config)
+        if self.conf.connection == 'coinbase':
+            self.connect = connection.coinBase.CoinBaseConnect(
+                self.conf.connection_config)
         else:
-            self.connect = trading.connection.simulation.SimulationConnect(
-                cfg.conf.connection_config)
+            self.connect = connection.simulation.SimulationConnect(
+                self.conf.connection_config)
 
         # Algo.
-        self.algo_if = trading.algo.algoMain.AlgoMain(
-            cfg.conf.algo_config)
+        self.algo_if = algo.AlgoMain(
+            self.conf.algo_config)
 
-        self.security = trading.algo.maxLost.MaxLost(cfg.conf.algo_config)
+        self.security = algo.Security(self.conf.algo_config)
 
         threading.Thread.__init__(self)
 
@@ -46,24 +47,24 @@ class Trading(threading.Thread):
                 - 1 thread by currency to deal with
         """
 
-        trading.model.create()
+        model.create()
         prev_currency_value = None
-        trans = trading.model.get_current_trading()
+        trans = model.get_current_trading()
 
         while self.loop == 1:
-            currency_value = self.connect.get_value(cfg.conf.currency)
+            currency_value = self.connect.get_value(self.conf.currency)
             if prev_currency_value != currency_value:
                 logging.warning('Currency Value: %s', currency_value)
                 # Update previous currency
                 prev_currency_value = currency_value
 
                 if not trans:
-                    trans = trading.model.Trading(
-                        buy_value=cfg.conf.transaction_amt,
-                        currency=cfg.conf.currency)
+                    trans = model.Trading(buy_value=self.conf.transaction_amt,
+                                          currency=self.conf.currency)
 
                 # Process trading
-                result = self.algo_if.process(currency_value)
+                result = self.algo_if.process(currency_value,
+                                              currency=self.conf.currency)
                 if trans.buy_date_time:
                     if (result < 0
                         or self.security.process(
@@ -78,7 +79,7 @@ class Trading(threading.Thread):
                     trans = trans.save_buy(*self.connect.buy(
                         trans.buy_value, trans.currency, currency_value))
 
-            time.sleep(cfg.conf.delay)
+            time.sleep(self.conf.delay)
             
     def stop(self):
         """Stop trading."""

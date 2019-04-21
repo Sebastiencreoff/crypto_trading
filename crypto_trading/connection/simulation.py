@@ -1,10 +1,10 @@
 import logging
 import random
 
-import trading.connection.connection
+from . import connection
 
 
-class SimulationConnect(trading.connection.connection.Connect):
+class SimulationConnect(connection.Connect):
     """CoinBase API connection."""
     
     def __init__(self, config_dict):

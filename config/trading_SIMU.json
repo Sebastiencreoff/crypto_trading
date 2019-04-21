@@ -4,6 +4,6 @@
     "transactionAmt" : 200,
     "delay" : 1,
     "connection" :"simulation",
-    "connectionConfig" : "config/connectSimu.json",
-    "algoConfig" : "config/algo.json"
+    "connectionConfig" : "connectSimu.json",
+    "algoConfig" : "algo.json"
 }

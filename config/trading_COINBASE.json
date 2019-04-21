@@ -4,6 +4,6 @@
     "transactionAmt" : 200,
     "delay" : 60,
     "connection" :"coinbase",
-    "connectionConfig" : "config/coinbase.json",
-    "algoConfig" : "config/algo.json"
+    "connectionConfig" : "coinbase.json",
+    "algoConfig" : "algo.json"
 }

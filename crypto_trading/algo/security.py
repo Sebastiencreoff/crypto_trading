@@ -2,7 +2,7 @@ import json
 import logging
 
 
-class MaxLost(object):
+class Security(object):
     """Class to thread hold to sell when the lost in a transaction is
     too high."""
 

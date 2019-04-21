@@ -4,9 +4,9 @@ import datetime
 import json
 import logging
 
-import trading.algo.model as model
-import trading.algo.average
-import trading.config as cfg
+from . import model
+from . import average
+import crypto_trading.config as cfg
 
 
 class AlgoMain:
@@ -17,20 +17,20 @@ class AlgoMain:
 
         self.__dict__ = json.load(open(config_dict, mode='r'))
         self.algo_ifs = []
-        self.algo_ifs.append(trading.algo.average.GuppyMMA(config_dict))
+        self.algo_ifs.append(average.GuppyMMA(config_dict))
 
         model.create()
 
-    def process(self, currency_value):
+    def process(self, currency_value, currency):
         """Process data, it returned 1 to buy and -1 to sell."""
 
         # Price data
-        model.pricing.Pricing(currency=cfg.conf.currency,
+        model.pricing.Pricing(currency=currency,
                               date_time=datetime.datetime.now(),
                               value=currency_value)
         result = 0
         for algo in self.algo_ifs:
-            result += algo.process(currency_value)
+            result += algo.process(currency_value, currency)
 
         logging.info('result: %d', result)
 
