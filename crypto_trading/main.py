@@ -21,7 +21,6 @@ def main():
                         default='DEBUG',
                         help='logging level(DEBUG,INFO,WARNING,ERROR,CRITICAL)',
                         type=str)
-    parser.add_argument("--verbosity", help="increase output verbosity")
     args = parser.parse_args()
 
     logging_level_int = getattr(logging, vars(args)['logging'], logging.DEBUG)

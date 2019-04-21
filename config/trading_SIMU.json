@@ -2,7 +2,7 @@
     "database_file" : "SIMU",
     "currency": "BTC",
     "transactionAmt" : 200,
-    "delay" : 1,
+    "delay" : 0,
     "connection" :"simulation",
     "connectionConfig" : "connectSimu.json",
     "algoConfig" : "algo.json"

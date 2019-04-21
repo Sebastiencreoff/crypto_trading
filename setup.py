@@ -23,20 +23,8 @@ setup(name='crypto_trading',
                         'sqlobject',
                         'coinbase',
                         'requests'
-                        ],
+      ],
+      tests_require=[
+          'pytest'
+      ],
       )
-
-
-#tests_require = [
-#   'pytest'
-#]
-#
-# try:
-#     from setuptools import setup
-# except ImportError:
-#     from distutils.core import setup
-
-# [nosetests]
-# verbosity=3
-# with-doctest=1
-# tests = tests/, tests/connection/

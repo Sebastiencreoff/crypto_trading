@@ -19,7 +19,7 @@ def manage_exception(func):
         while stop:
             try:
                 return func(*args)
-            except coinbase.wallet.errors.CoinbaseError as e:
+            except coinbase.wallet.error.CoinbaseError as e:
                 logging.critical('Coinbase error: {}'.format(e))
                 raise e
             except requests.exception.RequestException as e:

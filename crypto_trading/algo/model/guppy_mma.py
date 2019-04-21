@@ -22,6 +22,8 @@ class Guppy(sqlobject.SQLObject):
 
     DATE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
-    date_time = sqlobject.col.DateTimeCol(default=datetime.datetime.now())
     count = sqlobject.col.IntCol()
     currency = sqlobject.col.StringCol()
+    date_time = sqlobject.col.DateTimeCol(
+        default=sqlobject.col.DateTimeCol.now())
+

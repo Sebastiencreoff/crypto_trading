@@ -1,8 +1,8 @@
+import datetime
 import json
 import logging
 
 from . import model
-import crypto_trading.config as cfg
 
 
 class GuppyMMA(object):
@@ -56,7 +56,7 @@ class GuppyMMA(object):
 
             if avg.value:
                 min_val = min(min_val, avg.value)
-                max_val = min(max_val, avg.value)
+                max_val = max(max_val, avg.value)
                 values[avg.frequency] = avg.value
 
         return min_val, max_val, values
@@ -71,7 +71,7 @@ class GuppyMMA(object):
             self.long_terms, currency)
 
         count = 0
-        if long_max:
+        if len(long_values) == len(self.long_terms):
             for k, v in short_values.items():
                 if v and v >= long_max:
                     count += 1
@@ -82,7 +82,9 @@ class GuppyMMA(object):
             count=1,
             currency=currency)
 
-        guppy = model.guppy_mma.Guppy(count=count, currency=currency)
+        guppy = model.guppy_mma.Guppy(count=count,
+                                      currency=currency,
+                                      date_time=datetime.datetime.now(),)
         logging.debug('Guppy count: {}'.format(guppy.count))
 
         if not len(previous_guppy):
@@ -92,14 +94,12 @@ class GuppyMMA(object):
         previous_guppy = previous_guppy[0]
 
         # Test increasing values => BUY
-        if (guppy.count > previous_guppy.count
-            and guppy.count == self.buy):
+        if guppy.count > previous_guppy.count and guppy.count == self.buy:
             logging.warning('Guppy buy limit reached')
             return 1
 
         # Test decreasing values => SELL
-        elif (guppy.count < previous_guppy.count
-            and guppy.count <= self.sell):
+        elif guppy.count < previous_guppy.count and guppy.count <= self.sell:
             logging.warning('Guppy sell limit reached')
             return -1
 

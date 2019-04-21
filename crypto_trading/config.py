@@ -10,16 +10,17 @@ import sqlobject
 
 class Config:
     def __init__(self, config_file):
-        self.config_dict = json.load(open(config_file, mode='r'))
+        self.config_dict = json.load(open(
+            os.path.abspath(config_file), mode='r'))
 
         try:
-            dir_path = os.path.dirname(config_file) + '/'
+            self.dir_path = os.path.dirname(config_file) + '/'
             self.database_file = self.config_dict['database_file']
             self.currency = self.config_dict['currency']
             self.transaction_amt = self.config_dict['transactionAmt']
             self.connection = self.config_dict['connection']
-            self.connection_config = dir_path + self.config_dict['connectionConfig']
-            self.algo_config = dir_path + self.config_dict['algoConfig']
+            self.connection_config = self.dir_path + self.config_dict['connectionConfig']
+            self.algo_config = self.dir_path + self.config_dict['algoConfig']
             self.delay = self.config_dict['delay']
 
             # Database  name

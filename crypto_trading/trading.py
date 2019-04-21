@@ -29,7 +29,7 @@ class Trading(threading.Thread):
                 self.conf.connection_config)
         else:
             self.connect = connection.simulation.SimulationConnect(
-                self.conf.connection_config)
+                self.conf.connection_config, self.conf.dir_path)
 
         # Algo.
         self.algo_if = algo.AlgoMain(
@@ -54,7 +54,7 @@ class Trading(threading.Thread):
         while self.loop == 1:
             currency_value = self.connect.get_value(self.conf.currency)
             if prev_currency_value != currency_value:
-                logging.warning('Currency Value: %s', currency_value)
+                logging.info('Currency Value: %s', currency_value)
                 # Update previous currency
                 prev_currency_value = currency_value
 
@@ -65,11 +65,12 @@ class Trading(threading.Thread):
                 # Process trading
                 result = self.algo_if.process(currency_value,
                                               currency=self.conf.currency)
+
                 if trans.buy_date_time:
                     if (result < 0
                         or self.security.process(
-                                trans.buy_value,
-                                currency_value * trans.currency_buy_amt)):
+                                current_value=currency_value,
+                                transaction=trans)):
                         trans.save_sell(*self.connect.sell(
                             trans.currency_buy_amt, trans.currency,
                             currency_value))

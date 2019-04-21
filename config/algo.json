@@ -1,13 +1,14 @@
 {
     "GuppyMMA" : {
-        "short_term" : [3, 5, 8, 10, 12, 15],
-        "long_term" : [30, 35, 40, 45, 50, 60],
+        "short_term" : [30, 50, 80, 100, 120, 150],
+        "long_term" : [300, 350, 400, 450, 500, 600],
         "buy" : 6,
-        "sell" : 6
+        "sell" : 3
     },
     "maxLost" :{
-        "percentage" : 10,
-        "value"   : 100
+        "percentage" : 5,
+        "percentage_update"   : 2 ,
+        "mean" : 800
     }
 
 }

@@ -37,7 +37,8 @@ class Pricing(sqlobject.SQLObject):
 
     DATE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
-    date_time = sqlobject.col.DateTimeCol(default=datetime.datetime.now())
+    date_time = sqlobject.col.DateTimeCol(
+        default=sqlobject.col.DateTimeCol.now())
     value = sqlobject.col.FloatCol()
     currency = sqlobject.col.StringCol()
 
