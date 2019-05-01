@@ -43,7 +43,6 @@ class Security(object):
                            * (100 -  self.percentage)/100),
                 transaction_id=transaction.id)
 
-
         if self.security.min_value >= current_value:
             logging.error('SELL: value {} < Security min value {}'.format(
                 current_value, self.security.min_value))
