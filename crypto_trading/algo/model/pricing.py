@@ -39,7 +39,7 @@ class Pricing(sqlobject.SQLObject):
 
     date_time = sqlobject.col.DateTimeCol(
         default=sqlobject.col.DateTimeCol.now())
-    value = sqlobject.col.FloatCol()
+    value = sqlobject.col.FloatCol(default=None)
     currency = sqlobject.col.StringCol()
 
 

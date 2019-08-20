@@ -5,7 +5,7 @@ import os
 import nose.tools
 import unittest
 
-import trading.connection.dbtransaction
+import crypto_trading.connection.dbtransaction as dbtransaction
 
 
 class DbTransaction_test(unittest.TestCase):
@@ -18,7 +18,7 @@ class DbTransaction_test(unittest.TestCase):
     
     def test_transaction(self):
 
-        db = trading.connection.dbtransaction.DbTransaction('BTC')
+        db = dbtransaction.DbTransaction('BTC')
 
         db.reset()
         
@@ -28,7 +28,7 @@ class DbTransaction_test(unittest.TestCase):
         self.assertIsNotNone(buy_date)
         self.assertTrue(datetime.datetime.strptime(
             buy_date,
-            trading.connection.dbtransaction.DbTransaction.DATE_TIME_FORMAT)
+            dbtransaction.DbTransaction.DATE_TIME_FORMAT)
         )
 
         self.assertEqual(db.get_current_transaction()['buy_date_time'], buy_date)
@@ -38,7 +38,7 @@ class DbTransaction_test(unittest.TestCase):
 
     def test_errorOnDoubleTransaction(self):
 
-        db = trading.connection.dbtransaction.DbTransaction('BTC')
+        db = dbtransaction.DbTransaction('BTC')
         
         db.reset()
 
@@ -48,7 +48,7 @@ class DbTransaction_test(unittest.TestCase):
         self.assertIsNotNone(buy_date)
         self.assertTrue(datetime.datetime.strptime(
             buy_date,
-            trading.connection.dbtransaction.DbTransaction.DATE_TIME_FORMAT)
+            dbtransaction.DbTransaction.DATE_TIME_FORMAT)
         )
         self.assertEqual(db.get_current_transaction()['buy_date_time'], buy_date)
         self.assertTrue(db.sell(buy_date_time=buy_date, sell_value=10))

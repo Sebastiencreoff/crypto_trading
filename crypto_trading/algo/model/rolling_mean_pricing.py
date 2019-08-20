@@ -1,25 +1,26 @@
 import datetime
 import logging
 
+import pandas
 import sqlobject
 
 from .pricing import Pricing
 
 
 def insert_value(currency, frequency, values):
-    value = None
-    if values is not None and len(values) >= frequency:
-        value = (sum(values[-frequency:])
-                 / len(values[-frequency:]))
 
-    return RollingMeanPricing(currency=currency,
-                              date_time=datetime.datetime.now(),
-                              frequency=frequency,
-                              value=value)
+    kwargs = {'currency': currency,
+              'date_time': datetime.datetime.now(),
+              'frequency': frequency}
+
+    if values is not None and len(values) >= frequency:
+        kwargs['value'] = pandas.Series(values[-frequency:]).mean().item()
+
+    return RollingMeanPricing(**kwargs)
 
 
 def get_last_values(currency, frequency, count=None):
-    """Get last values."""
+    """Get last values with date_time increasing order."""
 
     logging.debug('nb_values: %d', count)
     pricing = RollingMeanPricing.select(

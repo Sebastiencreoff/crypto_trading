@@ -1,7 +1,7 @@
 import nose.tools
 import unittest
 
-import trading.connection.simulation
+import crypto_trading.connection.simulation as simu
 
 
 class SimulationConnectTest(unittest.TestCase):
@@ -15,14 +15,14 @@ class SimulationConnectTest(unittest.TestCase):
     def test_unknownCurrency(self):
     
         config_dict = {}
-        connect = trading.connection.simulation.SimulationConnect(config_dict)
+        connect = simu.SimulationConnect(config_dict)
         connect.reset()
         with self.assertRaises(NameError):
             connect.get_currency(ref_currency='Unknown Currency')
 
     def test_execute(self):
         config_dict = {}
-        connect = trading.connection.simulation.SimulationConnect(config_dict)
+        connect = simu.SimulationConnect(config_dict)
         connect.reset()
         currency_value = connect.get_currency(ref_currency='ETH')
 

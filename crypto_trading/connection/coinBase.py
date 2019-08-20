@@ -9,15 +9,16 @@ import coinbase.wallet.client
 from . import connection
 
 REF_CURRENCY = 'EUR'
+MAX_TRY = 10
 
 
 def manage_exception(func):
     @functools.wraps(func)
     def wrapper(*args):
-        stop = True
-
-        while stop:
+        count = 0
+        while count < MAX_TRY:
             try:
+                count += 1
                 return func(*args)
             except coinbase.wallet.error.CoinbaseError as e:
                 logging.critical('Coinbase error: {}'.format(e))
@@ -47,12 +48,12 @@ class CoinBaseConnect(connection.Connect):
         """
         logging.info('')
         assert os.path.isfile(config_dict)
-        self.__dict__ = json.load(open(config_dict, mode='r'))
-        self.simulation = self.__dict__.get('simulation', True)
+        cfg = json.load(open(config_dict, mode='r'))
+        self.simulation = cfg.get('simulation', True)
 
         self.client = coinbase.wallet.client.Client(
-            self.__dict__.get('api_key', None),
-            self.__dict__.get('api_secret', None))
+            cfg.get('api_key', None),
+            cfg.get('api_secret', None))
 
         # Check payment method
         self.payment_method = None

@@ -20,11 +20,13 @@ setup(name='crypto_trading',
         ],
       },
       install_requires=['setuptools',
-                        'sqlobject',
                         'coinbase',
-                        'requests'
+                        'numpy',
+                        'pandas',
+                        'requests',
+                        'sqlobject'
       ],
       tests_require=[
-          'pytest'
+          'nose'
       ],
       )

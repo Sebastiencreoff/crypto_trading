@@ -1,15 +1,17 @@
 import csv
 import json
 import logging
+import os
 import random
 
 from . import connection
 
+DFT_FEE_PERCENT = 0.015
 
 class SimulationConnect(connection.Connect):
     """CoinBase API connection."""
     
-    def __init__(self, config_dict, dir_path):
+    def __init__(self, config_dict, dir_path=None):
         """Initialisation of all configuration needed.
 
             :param config_dict: configuration dictionary for connection
@@ -19,16 +21,17 @@ class SimulationConnect(connection.Connect):
         """
         logging.info('SimulationConnect::building')
         super().__init__(config_dict)
-        self.__dict__ = json.load(open(config_dict, mode='r'))
+        cfg = json.load(open(config_dict, mode='r'))
 
+        self.fee_percent = cfg.get('fee_percent', DFT_FEE_PERCENT)
         self.value = 0
-        type_ = self.__dict__.get('type', 'random')
 
-        if type_ == 'file':
-            self.file = dir_path + self.__dict__.get('file')
+        if cfg.get('type', 'random') == 'file':
+            file_path = dir_path + cfg.get('file')
+            assert os.path.isfile(file_path)
             self.value_func = self.read_value
             self.index = 0
-            with open(self.file, 'r') as csv_file:
+            with open(file_path, 'r') as csv_file:
                 self.values = [float(x[0]) for x in csv.reader(csv_file)]
         else:
             self.value_func = self.get_random_value
@@ -74,7 +77,7 @@ class SimulationConnect(connection.Connect):
             >>> buy_currency(amount=10)
                 0.2, 0.01
         """
-        fee_amount = amount * 0.015
+        fee_amount = amount * self.fee_percent
         buy_amount = (amount - fee_amount) / self.value
         logging.warning('success currency: %s '
                         'amount: %s/%s (%s in EUR) '
@@ -98,7 +101,7 @@ class SimulationConnect(connection.Connect):
                 >>> sell(amount=0.1, currency='BTC')
                 10.1, 0.1
         """
-        fee_amount = amount * self.value * 0.015
+        fee_amount = amount * self.value * self.fee_percent
         logging.warning('success currency: %s '
                         'amount: %s/%s (%s in %s),'
                         'fee_amount: %s',

@@ -25,7 +25,7 @@ class Config:
 
             # Database  name
             self.pricing = 'Pricing'
-
+            self.db_conn = None
         except KeyError:
             logging.exception('error in configuration file')
 
@@ -33,6 +33,7 @@ class Config:
         sqlobject.sqlhub.processConnection = \
             sqlobject.dbconnection.connectionForURI(
                 'sqlite:{}'.format(os.path.abspath(self.database_file)))
+        self.db_conn = sqlobject.sqlhub.processConnection
 
 
 def init(config_file):

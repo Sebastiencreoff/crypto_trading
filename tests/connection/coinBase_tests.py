@@ -3,10 +3,9 @@
 import json
 import tempfile
 
-import pytest
 import unittest
 
-import trading.connection.coinBase
+import crypto_trading.connection.coinBase as coinbase
 
 
 class CoinBaseConnectTest(unittest.TestCase):
@@ -17,22 +16,18 @@ class CoinBaseConnectTest(unittest.TestCase):
                              'api_secret': 'xxx',
                              'simulation': True}).encode('utf-8'))
         fp.seek(0)
-        return fp
+        return fp.name
 
     def test_unknownCurrency(self):
 
-        with self.coinBase_config() as cfg_file:
-            connect = trading.connection.coinBase.CoinBaseConnect('BTC',
-                                                                  cfg_file.name)
+        connect = coinbase.CoinBaseConnect(self.coinBase_config())
 
         with self.assertRaises(NameError):
             connect.get_currency(ref_currency='Unknown Currency')
 
     def test_execute(self):
 
-        with self.coinBase_config() as cfg_file:
-            connect = trading.connection.coinBase.CoinBaseConnect('BTC',
-                                                                  cfg_file.name)
+        connect = coinbase.CoinBaseConnect(self.coinBase_config())
 
         self.assertTrue(connect.get_currency())
         self.assertFalse(connect.in_progress())
@@ -42,9 +37,7 @@ class CoinBaseConnectTest(unittest.TestCase):
 
     def test_error(self):
 
-        with self.coinBase_config() as cfg_file:
-            connect = trading.connection.coinBase.CoinBaseConnect('BTC',
-                                                                  cfg_file.name)
+        connect = coinbase.CoinBaseConnect(self.coinBase_config())
 
         # sell currency if no transaction processing
         self.assertFalse(connect.in_progress())

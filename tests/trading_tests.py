@@ -1,6 +1,6 @@
 import unittest
 
-import trading.algo.algoIf
-import trading.connection.connection
-import trading.trading
+import crypto_trading.algo.algoIf
+import crypto_trading.connection.connection
+import crypto_trading.trading
 

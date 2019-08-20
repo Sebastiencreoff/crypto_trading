@@ -30,19 +30,13 @@ def main():
         format='%(asctime)s  %(levelname)s %(module)s-%(funcName)s: %(message)s'
     )
 
-    # Create new threads
-    thread1 = crypto_trading.trading.Trading(vars(args)['config'])
+    trading = crypto_trading.trading.Trading(vars(args)['config'])
 
-    print("Starting Trading")
-    try:
-        thread1.start()
+    # Stopping properly.
+    for stop in [signal.SIGTERM, signal.SIGQUIT, signal.SIGINT]:
+        signal.signal(stop, lambda x, y: trading.stop())
 
-    except KeyboardInterrupt:
-        thread1.join()
-
-        print("\nTrading Finished!")
-
-    print("Exiting Main Thread")
+    trading.run()
 
 
 if __name__ == '__main__':
