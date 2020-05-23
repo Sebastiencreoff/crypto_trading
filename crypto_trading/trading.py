@@ -9,7 +9,7 @@ from . import connection
 from . import model
 
 
-class Trading(object):
+class Trading:
     """Trading process."""
 
     def __init__(self, config_file):
@@ -41,7 +41,6 @@ class Trading(object):
                 - 1 thread for data acquisition
                 - 1 thread by currency to deal with
         """
-
         logging.info("Starting Trading")
         model.create()
         prev_currency_value = None
@@ -49,7 +48,12 @@ class Trading(object):
 
         while self.loop == 1:
             session = self.conf.db_conn.transaction()
-            currency_value = self.connect.get_value(self.conf.currency)
+            try:
+                currency_value = self.connect.get_value(self.conf.currency)
+            except connection.EndOfProcess:
+                logging.info('End Of Processing')
+                return
+            
             if prev_currency_value != currency_value:
                 logging.info('Currency Value: %s', currency_value)
                 # Update previous currency
@@ -88,6 +92,13 @@ class Trading(object):
     logging.info("Stopping Trading")
 
 
-def stop(self):
-    """Stop trading."""
-    self.loop = 0
+    def stop(self):
+        """Stop trading."""
+        self.loop = 0
+
+    def profits(self):
+        return model.get_profits()
+
+    def reset(self):
+        model.reset(self.conf.currency)
+        self.algo_if.reset()

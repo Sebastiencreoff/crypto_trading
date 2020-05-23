@@ -2,4 +2,4 @@
 # -*- coding:utf-8 -*-
 
 from .coinBase import CoinBaseConnect
-from .simulation import SimulationConnect
+from .simulation import SimulationConnect, EndOfProcess

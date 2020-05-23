@@ -30,6 +30,16 @@ def get_current_trading():
         return trade[0]
     return None
 
+def get_profits():
+    """Get profits
+
+        :return : profits amount
+        :example :
+            >>> get_profits()
+            10.0
+    """
+    return sum( trade.profit  for trade in  Trading.select(Trading.q.profit != None ))
+
 
 class Trading(sqlobject.SQLObject):
     buy_date_time = sqlobject.col.DateTimeCol(default=None)
@@ -39,7 +49,7 @@ class Trading(sqlobject.SQLObject):
     currency_buy_value = sqlobject.col.FloatCol(default=None)
     currency_sell_value = sqlobject.col.FloatCol(default=None)
     currency = sqlobject.col.StringCol()
-    gain = sqlobject.col.FloatCol(default=None)
+    profit = sqlobject.col.FloatCol(default=None)
     sell_value_fee = sqlobject.col.FloatCol(default=None)
     sell_date_time = sqlobject.col.DateTimeCol(default=None)
 
@@ -81,7 +91,7 @@ class Trading(sqlobject.SQLObject):
                 self.buy_value, self.buy_date_time))
             return None
 
-        self.gain = (currency_sell_value * self.currency_buy_amt
+        self.profit = (currency_sell_value * self.currency_buy_amt
                      - self.buy_value
                      - self.buy_value_fee
                      - sell_value_fee)
@@ -89,5 +99,5 @@ class Trading(sqlobject.SQLObject):
         self.currency_sell_value = currency_sell_value
         self.sell_value_fee = sell_value_fee
         self.sell_date_time = datetime.datetime.now()
-        logging.warning('Closing trading with %s gain', self.gain)
+        logging.warning('Closing trading with %s profit', self.profit)
         return self

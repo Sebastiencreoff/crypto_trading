@@ -14,3 +14,10 @@ def create():
     MaxLost.createTable(ifNotExists=True)
     Pricing.createTable(ifNotExists=True)
     RollingMeanPricing.createTable(ifNotExists=True)
+
+def reset():
+    Bollinger.deleteMany(where=None)
+    Guppy.deleteMany(where=None)
+    MaxLost.deleteMany(where=None)
+    Pricing.deleteMany(where=None)
+    RollingMeanPricing.deleteMany(where=None)

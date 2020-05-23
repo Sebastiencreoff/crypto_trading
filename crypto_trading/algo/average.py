@@ -47,7 +47,7 @@ class GuppyMMA(object):
     def process_freq(self, frequencies, currency, values):
         min_val = None
         max_val = None
-        values = {}
+        return_values = {}
         for freq in frequencies:
             avg = model.rolling_mean_pricing.insert_value(currency=currency,
                                                           frequency=freq,
@@ -61,9 +61,9 @@ class GuppyMMA(object):
             if avg.value:
                 min_val = min(min_val, avg.value)
                 max_val = max(max_val, avg.value)
-                values[avg.frequency] = avg.value
+                return_values[avg.frequency] = avg.value
 
-        return min_val, max_val, values
+        return min_val, max_val, return_values
 
     def process(self, current_value, values, currency):
         """Process data, it returned 1 to buy and -1 to sell."""
@@ -97,8 +97,8 @@ class GuppyMMA(object):
                 return 0
 
             # Test increasing values => BUY
-            if (short_values[18] >= short_values[30] >= short_values[48]
-                    and long_values[180] >= long_values[210] >= long_values[240]
+            if (short_values[self.short_terms[0]] >= short_values[self.short_terms[1]] >= short_values[self.short_terms[2]]
+                    and long_values[self.long_terms[0]] >= long_values[self.long_terms[1]] >= long_values[self.long_terms[2]]
                     and all(x.count == self.buy for x in previous_guppy[1:])
                     and previous_guppy[0].count != self.buy):
                 logging.info('Guppy buy limit reached')
@@ -106,7 +106,7 @@ class GuppyMMA(object):
 
             # Test decreasing values => SELL
             if (all(x.count <= self.sell for x in previous_guppy)
-                    and long_values[180] <= long_values[210] <= long_values[240]):
+                    and long_values[self.long_terms[0]] <= long_values[self.long_terms[1]] <= long_values[self.long_terms[2]]):
                 logging.info('Guppy sell limit reached')
                 return -1
 

@@ -1,19 +1,33 @@
 {
-    "GuppyMMA" : {
-        "short_term" : [30, 50, 80, 100, 120, 150],
-        "long_term" : [300, 350, 400, 450, 500, 600],
-        "buy" : 6,
-        "sell" : 6
-    },
-    "maxLost" : {
-        "percentage" : 3,
-        "percentage_update"   : 0.25,
-        "mean" : 720
-    },
-    "takeProfit": {
-        "percentage" : 5
-    },
-    "Bollinger": {
-        "frequency" : 100
-    }
+  "GuppyMMA": {
+    "short_term": [
+      30,
+      50,
+      80,
+      100,
+      120,
+      150
+    ],
+    "long_term": [
+      300,
+      350,
+      400,
+      450,
+      500,
+      600
+    ],
+    "buy": 2,
+    "sell": 2
+  },
+  "maxLost": {
+    "percentage": 82,
+    "percentage_update": 85.71012878417969,
+    "mean": 732
+  },
+  "takeProfit": {
+    "percentage": 77.92420196533203
+  },
+  "Bollinger": {
+    "frequency": 289
+  }
 }

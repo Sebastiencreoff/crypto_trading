@@ -15,7 +15,6 @@ def insert_value(currency, frequency, values):
 
     if values is not None and len(values) >= frequency:
         kwargs['value'] = pandas.Series(values[-frequency:]).mean().item()
-
     return RollingMeanPricing(**kwargs)
 
 

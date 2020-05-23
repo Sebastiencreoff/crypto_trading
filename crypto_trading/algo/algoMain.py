@@ -45,4 +45,6 @@ class AlgoMain:
 
         return result
 
+    def reset(self):
+        model.reset()
 

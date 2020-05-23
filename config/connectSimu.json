@@ -1,5 +1,5 @@
 {
   "type" : "file",
-  "file" : "../inputs/ETH.csv",
+  "file" : "../inputs/BTC_2019-04-18_to_2019-04-24.csv",
   "fee_percent" : 0.005
 }

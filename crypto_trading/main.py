@@ -23,14 +23,14 @@ def main():
                         type=str)
     args = parser.parse_args()
 
-    logging_level_int = getattr(logging, vars(args)['logging'], logging.DEBUG)
+    logging_level_int = getattr(logging, args.logging, logging.DEBUG)
 
     logging.basicConfig(
         level=logging_level_int,
         format='%(asctime)s  %(levelname)s %(module)s-%(funcName)s: %(message)s'
     )
 
-    trading = crypto_trading.trading.Trading(vars(args)['config'])
+    trading = crypto_trading.trading.Trading(args.config)
 
     # Stopping properly.
     for stop in [signal.SIGTERM, signal.SIGQUIT, signal.SIGINT]:

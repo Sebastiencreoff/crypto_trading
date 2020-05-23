@@ -8,6 +8,10 @@ from . import connection
 
 DFT_FEE_PERCENT = 0.015
 
+class EndOfProcess(Exception):
+    pass
+
+
 class SimulationConnect(connection.Connect):
     """CoinBase API connection."""
     
@@ -40,9 +44,12 @@ class SimulationConnect(connection.Connect):
         return self.value_func(currency)
 
     def read_value(self, currency=None):
-        self.index += 1
-        self.value = self.values[self.index]
-        return self.value
+        try:
+            self.value = self.values[self.index]
+            self.index += 1
+            return self.value
+        except IndexError:
+            raise EndOfProcess
 
     def get_random_value(self, currency=None):
         """Get currencies from coinBase in refCurrency.

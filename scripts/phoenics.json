@@ -1,0 +1,22 @@
+{
+    "general": {
+		"batches": 1,
+		"parallel": true,
+		"boosted":  true,
+		"backend": "tfprob",
+		"sampling_strategies": 2
+    },
+    "parameters": [
+        {"name": "GuppyMMA_buy", "type": "continuous", "low": 0, "high": 6, "size": 1},
+        {"name": "GuppyMMA_sell", "type": "continuous", "low": 0, "high": 6, "size": 1},
+        {"name": "maxLost_perc", "type": "continuous", "low": 0, "high": 100, "size": 1},
+        {"name": "maxLost_perc_update", "type": "continuous", "low": 0, "high": 100, "size": 1},
+        {"name": "maxLost_mean", "type": "continuous", "low": 0, "high": 2000, "size": 1},
+        {"name": "takeProfit_perc", "type": "continuous", "low": 0, "high": 100, "size": 1},
+        {"name": "bollinger", "type": "continuous", "low": 0, "high": 2000, "size": 1}
+        
+    ],
+    "objectives": [
+        {"name": "profit", "goal": "maximize"}
+    ]
+}
