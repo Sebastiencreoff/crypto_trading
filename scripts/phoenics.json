@@ -4,9 +4,10 @@
 		"parallel": true,
 		"boosted":  true,
 		"backend": "tfprob",
-		"sampling_strategies": 2
+		"sampling_strategies": 3
     },
     "parameters": [
+        {"name": "GuppyMMA_coef", "type": "continuous", "low": 0, "high": 10, "size": 1},
         {"name": "GuppyMMA_buy", "type": "continuous", "low": 0, "high": 6, "size": 1},
         {"name": "GuppyMMA_sell", "type": "continuous", "low": 0, "high": 6, "size": 1},
         {"name": "maxLost_perc", "type": "continuous", "low": 0, "high": 100, "size": 1},
