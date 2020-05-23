@@ -10,8 +10,8 @@ from crypto_trading import trading
 
 CONFIG = {
     "GuppyMMA" : {
-        "short_term" : [30, 50, 80, 100, 120, 150],
-        "long_term" : [300, 350, 400, 450, 500, 600],
+        "short_term" : [3, 5, 8, 10, 12, 15],
+        "long_term" : [30, 35, 40, 45, 50, 60],
         "buy" : 6,
         "sell" : 6
     },
@@ -29,11 +29,13 @@ CONFIG = {
 }
 
 MAX_ITER = 100
-
+MAX_PROFIT = 0
 def merit_function(params):
     # Update algo configuration.
     config = copy.deepcopy(CONFIG)
-
+     
+    config['GuppyMMA']['short_term'] = [ int(x * params['GuppyMMA_coef'][0]) for x in config['GuppyMMA']['short_term'] ]
+    config['GuppyMMA']['long_term'] = [ int(x * params['GuppyMMA_coef'][0]) for x in config['GuppyMMA']['long_term'] ]
     config['GuppyMMA']['buy'] = int(params['GuppyMMA_buy'][0])
     config['GuppyMMA']['sell'] = int(params['GuppyMMA_sell'][0])
     config['maxLost']['percentage'] = int(params['maxLost_perc'][0])
@@ -52,6 +54,12 @@ def merit_function(params):
         pass
     params['profit'] = simu.profits()
     simu.reset()
+    
+    global MAX_PROFIT
+    if params['profit'] > MAX_PROFIT:
+        MAX_PROFIT = params['profit']
+        print(f'MAX Profit: {params["profit"]} Config: {config}')
+
     print(f'Profit: {params["profit"]} Config: {config}')
     return params
 
