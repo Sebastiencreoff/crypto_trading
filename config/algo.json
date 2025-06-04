@@ -29,5 +29,9 @@
   },
   "Bollinger": {
     "frequency": 289
+  },
+  "MovingAverageCrossover": {
+    "short_window": 20,
+    "long_window": 50
   }
 }
