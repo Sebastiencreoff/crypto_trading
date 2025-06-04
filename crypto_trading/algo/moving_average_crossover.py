@@ -1,5 +1,5 @@
 import logging
-import json
+# import json # Removed as no longer needed
 import numpy as np
 from .algoIf import AlgoIf
 
@@ -7,45 +7,47 @@ class MovingAverageCrossover(AlgoIf):
     """
     Trading algorithm based on moving average crossovers.
     """
+    # Default values that can be overridden by config
+    DEFAULT_SHORT_WINDOW = 20
+    DEFAULT_LONG_WINDOW = 50
 
-    def __init__(self, config_dict):
+    def __init__(self, mac_config): # Parameter is now the MovingAverageCrossover specific config dict
         """
         Initializes the MovingAverageCrossover algorithm.
 
         Args:
-            config_dict (str): Path to the JSON configuration file.
+            mac_config (dict): Configuration dictionary for this algorithm.
         """
-        logging.debug("Initializing MovingAverageCrossover")
-        try:
-            with open(config_dict, mode='r') as f:
-                cfg = json.load(f)
-            algo_config = cfg.get("MovingAverageCrossover", {})
-            self.short_window = algo_config.get("short_window", 20)
-            self.long_window = algo_config.get("long_window", 50)
+        # No super().__init__() call as AlgoIf has no __init__
+        logging.debug(f"Initializing MovingAverageCrossover with config: {mac_config}")
 
-            if self.short_window >= self.long_window:
-                logging.error("Short window must be less than long window for MovingAverageCrossover.")
-                # Potentially raise an error or handle this case appropriately
-                # For now, defaulting to safe values if config is problematic
-                self.short_window = 20
-                self.long_window = 50
+        self.active = False # Default to inactive
+        # Initialize with defaults, then try to update from config
+        self.short_window = self.DEFAULT_SHORT_WINDOW
+        self.long_window = self.DEFAULT_LONG_WINDOW
 
-        except FileNotFoundError:
-            logging.error(f"Configuration file not found: {config_dict}")
-            self.short_window = 20
-            self.long_window = 50
-        except json.JSONDecodeError:
-            logging.error(f"Error decoding JSON from configuration file: {config_dict}")
-            self.short_window = 20
-            self.long_window = 50
-        except Exception as e:
-            logging.error(f"An unexpected error occurred during MovingAverageCrossover initialization: {e}")
-            self.short_window = 20
-            self.long_window = 50
+        if mac_config:
+            self.active = mac_config.get('enabled', True) # Default to True if section exists
+            if self.active:
+                self.short_window = mac_config.get("short_window", self.DEFAULT_SHORT_WINDOW)
+                self.long_window = mac_config.get("long_window", self.DEFAULT_LONG_WINDOW)
 
-        logging.info(
-            f"MovingAverageCrossover initialized with short_window: {self.short_window}, long_window: {self.long_window}"
-        )
+                if self.short_window >= self.long_window:
+                    logging.error(
+                        f"MovingAverageCrossover config error: short_window ({self.short_window}) "
+                        f"must be less than long_window ({self.long_window}). "
+                        f"Using defaults: short={self.DEFAULT_SHORT_WINDOW}, long={self.DEFAULT_LONG_WINDOW}."
+                    )
+                    self.short_window = self.DEFAULT_SHORT_WINDOW
+                    self.long_window = self.DEFAULT_LONG_WINDOW
+                logging.info(
+                    f"MovingAverageCrossover active with short_window: {self.short_window}, long_window: {self.long_window}"
+                )
+            else:
+                logging.info("MovingAverageCrossover is configured but not active (enabled: false).")
+        else:
+            logging.info("MovingAverageCrossover configuration section not found or is empty. MA Crossover will be inactive.")
+            # self.active is already False, windows are defaults
 
     def max_frequencies(self):
         """
@@ -61,33 +63,38 @@ class MovingAverageCrossover(AlgoIf):
             return None
         return np.mean(data[-window:])
 
-    def process(self, current_value, values, currency):
+    # Signature changed to match AlgoIf.process
+    def process(self, current_value, historical_values, currency, **kwargs): # Renamed 'values', added **kwargs
         """
         Process data to generate trading signals.
 
         Args:
             current_value (float): The current price of the asset.
-            values (list[float]): A list of historical closing prices.
+            historical_values (list[float]): A list of historical closing prices.
                                    The list is expected to be ordered from oldest to newest.
             currency (str): The currency pair being traded (e.g., "BTC-USD").
+            **kwargs: Additional keyword arguments (not used by this algorithm).
 
         Returns:
             int: 1 to buy, -1 to sell, 0 for no action.
         """
+        if not self.active: # Added active check
+            return 0
+
         logging.debug(f"Processing MovingAverageCrossover for {currency} with current value {current_value}")
 
-        if len(values) < self.long_window:
+        if len(historical_values) < self.long_window: # Renamed 'values'
             logging.info("Not enough data to calculate long moving average.")
             return 0  # Not enough data
 
-        # Ensure values are floats for numpy calculations
+        # Ensure historical_values are floats for numpy calculations
         try:
-            numeric_values = [float(v) for v in values]
-        except (ValueError, TypeError): # Catch TypeError here as well
-            try: # If values are Pydantic objects from model.pricing.Pricing.value
-                numeric_values = [float(v.value) for v in values]
+            numeric_values = [float(v) for v in historical_values] # Renamed 'values'
+        except (ValueError, TypeError):
+            try:
+                numeric_values = [float(v.value) for v in historical_values] # Renamed 'values'
             except (TypeError, AttributeError, ValueError) as e:
-                logging.error(f"Could not convert values to float: {values}. Error: {e}")
+                logging.error(f"Could not convert historical_values to float: {historical_values}. Error: {e}") # Renamed 'values'
                 return 0
 
 

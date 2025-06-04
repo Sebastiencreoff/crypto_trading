@@ -2,6 +2,7 @@
 
 import logging
 import time
+import json # Added json import
 
 from . import algo
 from . import config as cfg
@@ -30,9 +31,26 @@ class Trading:
                 self.conf.connection_config, self.conf.dir_path)
 
         # Algo.
-        self.algo_if = algo.AlgoMain(self.conf.algo_config)
+        self.algo_if = algo.AlgoMain(self.conf.algo_config) # AlgoMain expects the file path
 
-        self.security = algo.Security(self.conf.algo_config)
+        # Load algo_config_data for Security
+        algo_config_data = {}
+        try:
+            with open(self.conf.algo_config, mode='r') as f:
+                algo_config_data = json.load(f)
+        except FileNotFoundError:
+            logging.error(f"Algorithm configuration file not found: {self.conf.algo_config} when initializing Security.")
+        except json.JSONDecodeError:
+            logging.error(f"Error decoding JSON from algorithm configuration file: {self.conf.algo_config} when initializing Security.")
+        # Add a general catch-all for other potential errors during file loading
+        except Exception as e:
+            logging.error(f"An unexpected error occurred loading {self.conf.algo_config}: {e}")
+
+        sec_config_data = {
+            "maxLost": algo_config_data.get("maxLost", {}),
+            "takeProfit": algo_config_data.get("takeProfit", {})
+        }
+        self.security = algo.Security(sec_config_data)
 
     def run(self):
         """Launch the trading process.
