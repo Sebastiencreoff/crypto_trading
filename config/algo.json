@@ -33,5 +33,9 @@
   "MovingAverageCrossover": {
     "short_window": 20,
     "long_window": 50
+  },
+  "AIAlgo": {
+    "enabled": true,
+    "model_path": "models/ai_algo_model.pth"
   }
 }
