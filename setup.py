@@ -24,7 +24,8 @@ setup(name='crypto_trading',
                         'numpy',
                         'pandas',
                         'requests',
-                        'sqlobject'
+                        'sqlobject',
+                        'streamlit'
       ],
       tests_require=[
           'nose'

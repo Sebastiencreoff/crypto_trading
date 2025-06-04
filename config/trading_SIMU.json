@@ -1,9 +1,13 @@
 {
-    "database_file" : "SIMU",
-    "currency": "BTC",
-    "transactionAmt" : 200,
-    "delay" : 0,
-    "connection" :"simulation",
-    "connectionConfig" : "connectSimu.json",
-    "algoConfig" : "algo.json"
+  "database_file": "SIMU_updated.db",
+  "currency": "ETH-USD",
+  "transactionAmt": 150.0,
+  "delay": 120,
+  "connection": {
+    "type": "simulation",
+    "config_file": "connectSimu.json"
+  },
+  "connectionConfig": "connectSimu.json",
+  "algoConfig": "algo.json",
+  "unusedTradingSimuParam": "value"
 }

@@ -1,5 +1,6 @@
 {
-  "type" : "file",
-  "file" : "../inputs/BTC_2019-04-18_to_2019-04-24.csv",
-  "fee_percent" : 0.005
+  "type": "file",
+  "file": "new_sim_file.csv",
+  "fee_percent": 0.0025,
+  "unusedConnectParam": "value"
 }
