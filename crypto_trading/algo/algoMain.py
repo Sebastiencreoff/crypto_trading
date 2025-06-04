@@ -8,6 +8,7 @@ from . import model
 from . import average
 from . import bollinger
 from . import moving_average_crossover
+from .ai_algo import AIAlgo
 
 
 class AlgoMain:
@@ -21,6 +22,8 @@ class AlgoMain:
         self.algo_ifs.append(average.GuppyMMA(config_dict))
         self.algo_ifs.append(bollinger.Bollinger(config_dict))
         self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(config_dict))
+        if self.__dict__.get("AIAlgo", {}).get("enabled", False):
+            self.algo_ifs.append(AIAlgo(self.__dict__))
 
         self.max_frequencies = max(x.max_frequencies()
                                    for x in self.algo_ifs

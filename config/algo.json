@@ -28,6 +28,14 @@
     "percentage": 5.0
   },
   "Bollinger": {
-    "frequency": 100
+    "frequency": 289
+  },
+  "MovingAverageCrossover": {
+    "short_window": 20,
+    "long_window": 50
+  },
+  "AIAlgo": {
+    "enabled": true,
+    "model_path": "models/ai_algo_model.pth"
   }
 }

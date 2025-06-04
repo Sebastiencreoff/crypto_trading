@@ -14,12 +14,12 @@ MAX_TRY = 10
 
 def manage_exception(func):
     @functools.wraps(func)
-    def wrapper(*args):
+    def wrapper(*args, **kwargs): # Added **kwargs
         count = 0
         while count < MAX_TRY:
             try:
                 count += 1
-                return func(*args)
+                return func(*args, **kwargs) # Added **kwargs
             except coinbase.wallet.error.CoinbaseError as e:
                 logging.critical('Coinbase error: {}'.format(e))
                 raise e
@@ -57,23 +57,31 @@ class CoinBaseConnect(connection.Connect):
 
         # Check payment method
         self.payment_method = None
-
-        logging.debug('coinbase payment_method: %s',
-                        self.client.get_payment_methods())
-
-        for payment_method in self.client.get_payment_methods().data:
-            if payment_method['type'] == 'fiat_account':
-                self.payment_method = payment_method
+        try:
+            payment_methods_response = self.client.get_payment_methods()
+            logging.debug('coinbase payment_method response: %s', payment_methods_response)
+            if payment_methods_response and payment_methods_response.data:
+                for payment_method_data in payment_methods_response.data:
+                    # Assuming payment_method_data is a dict-like object
+                    if payment_method_data.get('type') == 'fiat_account':
+                        self.payment_method = payment_method_data # Store the dict-like object
+                        break # Found a fiat_account, no need to continue
+        except requests.exceptions.RequestException as e:
+            logging.warning("Failed to get payment methods during init, possibly due to invalid credentials or network issue: %s", e)
+            # self.payment_method remains None, subsequent check will handle it
 
         if not self.payment_method:
-            logging.critical('fiat_account not found')
-            raise NameError('Only fiat_account is accepted')
+            logging.critical('fiat_account not found or failed to retrieve payment methods.')
+            # Consider if NameError is still appropriate or if a custom exception is better
+            raise NameError('Fiat account not found or failed to retrieve payment methods. Check credentials and API access.')
 
-        logging.info('coinbase payment_method id: %s', self.payment_method.id)
+        # If self.payment_method is set, it should be the dict-like object. Access its id via get.
+        logging.info('coinbase payment_method id: %s', self.payment_method['id'] if self.payment_method else "N/A") # Changed .get('id') to ['id'] for consistency if it's a dict
         super().__init__(config_dict)
 
     def _get_account_id(self, currency):
-        for account in self.client.get_accounts().data:
+        # Ensure this returns a dict, as used by buy/sell methods now expecting ['id']
+        for account in self.client.get_accounts().data: # This data is a list of dicts from setUp
             if account['currency'] == currency:
                 return account
 
@@ -114,10 +122,12 @@ class CoinBaseConnect(connection.Connect):
             >>> buy_currency(amount=10)
                 0.2, 0.01
         """
-        buy = self.client.buy(self._get_account_id(currency).id,
+        account_id = self._get_account_id(currency)['id']
+        payment_method_id = self.payment_method['id']
+        buy = self.client.buy(account_id,
                               amount=amount,
                               currency=REF_CURRENCY,
-                              payment_method=self.payment_method.id,
+                              payment_method=payment_method_id,
                               quote=self.simulation)
 
         logging.debug('response: %s', buy)
@@ -146,10 +156,12 @@ class CoinBaseConnect(connection.Connect):
                 >>> sell(amount=0.1, currency='BTC')
                 10.1, 0.1
         """
-        sell = self.client.sell(self._get_account_id(currency).id,
+        account_id = self._get_account_id(currency)['id']
+        payment_method_id = self.payment_method['id']
+        sell = self.client.sell(account_id,
                                 amount=amount,
                                 currency=currency,
-                                payment_method=self.payment_method.id,
+                                payment_method=payment_method_id,
                                 quote=self.simulation)
 
         logging.debug('response: %s', sell)
