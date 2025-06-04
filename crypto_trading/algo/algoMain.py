@@ -5,9 +5,9 @@ import json
 import logging
 
 from . import model
-from . import average
-from . import bollinger
-from . import moving_average_crossover
+from . import average # Required for isinstance check
+from . import bollinger # Required for isinstance check
+from . import moving_average_crossover # Required for isinstance check
 from .ai_algo import AIAlgo
 
 
@@ -22,12 +22,18 @@ class AlgoMain:
         self.algo_ifs.append(average.GuppyMMA(config_dict))
         self.algo_ifs.append(bollinger.Bollinger(config_dict))
         self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(config_dict))
+
         if self.__dict__.get("AIAlgo", {}).get("enabled", False):
             self.algo_ifs.append(AIAlgo(self.__dict__))
 
-        self.max_frequencies = max(x.max_frequencies()
-                                   for x in self.algo_ifs
-                                   if x.max_frequencies())
+        self.max_frequencies = 0
+        if self.algo_ifs:
+            try:
+                valid_freqs = [x.max_frequencies() for x in self.algo_ifs if hasattr(x, 'max_frequencies') and x.max_frequencies() is not None]
+                if valid_freqs:
+                    self.max_frequencies = max(valid_freqs)
+            except AttributeError as e:
+                logging.warning(f"An algorithm without max_frequencies method might be present or max_frequencies returned None: {e}")
         model.create()
 
     def process(self, current_value, currency):
@@ -38,18 +44,33 @@ class AlgoMain:
                               date_time=datetime.datetime.now(),
                               value=current_value)
 
-        values = model.pricing.get_last_values(
-            count=self.max_frequencies,
-            currency=currency)
+        values = []
+        if self.max_frequencies > 0:
+            values = model.pricing.get_last_values(
+                count=self.max_frequencies,
+                currency=currency)
+        else:
+            logging.warning("max_frequencies is 0, not fetching historical values.")
 
-        result = 0
-        for algo in self.algo_ifs:
-            result += algo.process(current_value, values, currency)
+        total_result = 0
+        indicator_signals = {}
 
-        logging.info('result: %d', result)
+        # Process non-AI algorithms first and collect their signals
+        for algo_instance in self.algo_ifs:
+            if not isinstance(algo_instance, AIAlgo):
+                signal = algo_instance.process(current_value, values, currency)
+                indicator_signals[algo_instance.__class__.__name__] = signal
+                total_result += signal
 
-        return result
+        # Process AIAlgo, passing in the collected signals
+        for algo_instance in self.algo_ifs:
+            if isinstance(algo_instance, AIAlgo):
+                # AIAlgo's process method will need to be updated to accept indicator_signals dict.
+                ai_signal = algo_instance.process(current_value, values, currency, indicator_signals)
+                total_result += ai_signal
+
+        logging.info('Total result after all algos: %d', total_result)
+        return total_result
 
     def reset(self):
         model.reset()
-
