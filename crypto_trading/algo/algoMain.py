@@ -7,6 +7,7 @@ import logging
 from . import model
 from . import average
 from . import bollinger
+from . import moving_average_crossover
 
 
 class AlgoMain:
@@ -19,6 +20,7 @@ class AlgoMain:
         self.algo_ifs = []
         self.algo_ifs.append(average.GuppyMMA(config_dict))
         self.algo_ifs.append(bollinger.Bollinger(config_dict))
+        self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(config_dict))
 
         self.max_frequencies = max(x.max_frequencies()
                                    for x in self.algo_ifs

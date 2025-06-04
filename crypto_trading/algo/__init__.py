@@ -1,6 +1,7 @@
-#!/usr/bin/env python
-# -*- coding:utf-8 -*-
+# crypto_trading/algo/__init__.py
+from .algoIf import AlgoIf
+from .average import GuppyMMA
+from .bollinger import Bollinger
+from .moving_average_crossover import MovingAverageCrossover
 
-
-from .algoMain import AlgoMain
-from .security import Security
+__all__ = ['AlgoIf', 'GuppyMMA', 'Bollinger', 'MovingAverageCrossover']
