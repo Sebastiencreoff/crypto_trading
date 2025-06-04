@@ -31,7 +31,7 @@ class DbTransaction_test(unittest.TestCase):
             dbtransaction.DbTransaction.DATE_TIME_FORMAT)
         )
 
-        self.assertEqual(db.get_current_transaction()['datetime'], buy_date) # Changed 'buy_date_time' to 'datetime'
+        self.assertEqual(db.get_current_transaction()['buy_date_time'], buy_date)
 
         self.assertTrue(db.sell(buy_date_time=buy_date, sell_value=10))
         self.assertEqual(db.get_current_transaction(), None)
@@ -50,6 +50,6 @@ class DbTransaction_test(unittest.TestCase):
             buy_date,
             dbtransaction.DbTransaction.DATE_TIME_FORMAT)
         )
-        self.assertEqual(db.get_current_transaction()['datetime'], buy_date) # Changed 'buy_date_time' to 'datetime'
+        self.assertEqual(db.get_current_transaction()['buy_date_time'], buy_date)
         self.assertTrue(db.sell(buy_date_time=buy_date, sell_value=10))
         self.assertEqual(db.get_current_transaction(), None)

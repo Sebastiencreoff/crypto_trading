@@ -1,13 +1,9 @@
 {
-  "database_file": "COINBASE_updated.db",
-  "currency": "ETH-USD",
-  "transactionAmt": 250.0,
-  "delay": 240,
-  "connection": {
-    "type": "coinbase",
-    "config_file": "coinbase_API.json"
-  },
-  "connectionConfig": "coinbase.json",
-  "algoConfig": "algo.json",
-  "unusedTradingCoinbaseParam": "value"
+    "database_file" : "COINBASE",
+    "currency": "BTC",
+    "transactionAmt" : 200,
+    "delay" : 60,
+    "connection" :"coinbase",
+    "connectionConfig" : "coinbase.json",
+    "algoConfig" : "algo.json"
 }
