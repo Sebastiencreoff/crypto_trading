@@ -26,7 +26,8 @@ setup(name='crypto_trading',
                         'requests',
                         'sqlobject',
                         'psycopg2-binary',
-                        'boto3'
+                        'boto3',
+                        'python-binance>=1.0.16'
       ],
       tests_require=[
           'nose'

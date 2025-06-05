@@ -12,6 +12,8 @@ from crypto_trading.database import models as db_models
 
 from . import algo
 from . import connection
+# Removed: from .connection import coinBase (No longer exists)
+from .connection import binance
 
 # Removed: from . import model (SQLObject model)
 
@@ -33,12 +35,13 @@ class Trading:
         self.logger.info(f"Initializing trading task {self.task_id} for currency {self.conf.currency}")
 
         self.connect = None # Exchange connection, not DB connection
-        if self.conf.connection_type == 'coinbase':
-            self.connect = connection.coinBase.CoinBaseConnect(
-                self.conf.connection_config_path) # Use updated config path attribute
-        elif self.conf.connection_type == 'simulation':
+        # Removed Coinbase connection handling
+        if self.conf.connection_type == 'simulation':
             self.connect = connection.simulation.SimulationConnect(
                 self.conf.connection_config_path, self.conf.dir_path)
+        elif self.conf.connection_type == 'binance':
+            self.connect = connection.binance.BinanceConnect(
+                self.conf.connection_config_path)
         else:
             error_msg = f"Task {self.task_id}: Unknown connection type: {self.conf.connection_type}"
             self.logger.error(error_msg)
