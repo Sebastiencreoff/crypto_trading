@@ -1,5 +1,4 @@
 import logging
-import json
 import numpy as np
 from .algoIf import AlgoIf
 
@@ -13,13 +12,11 @@ class MovingAverageCrossover(AlgoIf):
         Initializes the MovingAverageCrossover algorithm.
 
         Args:
-            config_dict (str): Path to the JSON configuration file.
+            config_dict (dict): Python dictionary containing the configuration.
         """
         logging.debug("Initializing MovingAverageCrossover")
         try:
-            with open(config_dict, mode='r') as f:
-                cfg = json.load(f)
-            algo_config = cfg.get("MovingAverageCrossover", {})
+            algo_config = config_dict.get("MovingAverageCrossover", {})
             self.short_window = algo_config.get("short_window", 20)
             self.long_window = algo_config.get("long_window", 50)
 
@@ -30,14 +27,6 @@ class MovingAverageCrossover(AlgoIf):
                 self.short_window = 20
                 self.long_window = 50
 
-        except FileNotFoundError:
-            logging.error(f"Configuration file not found: {config_dict}")
-            self.short_window = 20
-            self.long_window = 50
-        except json.JSONDecodeError:
-            logging.error(f"Error decoding JSON from configuration file: {config_dict}")
-            self.short_window = 20
-            self.long_window = 50
         except Exception as e:
             logging.error(f"An unexpected error occurred during MovingAverageCrossover initialization: {e}")
             self.short_window = 20
@@ -46,6 +35,19 @@ class MovingAverageCrossover(AlgoIf):
         logging.info(
             f"MovingAverageCrossover initialized with short_window: {self.short_window}, long_window: {self.long_window}"
         )
+
+    def update_config(self, mac_params_dict):
+        """Updates the MovingAverageCrossover configuration."""
+        logging.debug(f"Updating MovingAverageCrossover configuration with: {mac_params_dict}")
+        new_short_window = mac_params_dict.get('short_window', self.short_window)
+        new_long_window = mac_params_dict.get('long_window', self.long_window)
+
+        if new_short_window < new_long_window:
+            self.short_window = new_short_window
+            self.long_window = new_long_window
+            logging.info(f"MovingAverageCrossover configuration updated: short_window={self.short_window}, long_window={self.long_window}")
+        else:
+            logging.warning(f"Invalid window sizes in update_config for MovingAverageCrossover: short={new_short_window}, long={new_long_window}. Keeping existing values: short_window={self.short_window}, long_window={self.long_window}")
 
     def max_frequencies(self):
         """

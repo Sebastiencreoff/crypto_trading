@@ -49,9 +49,9 @@ class AlgoMain:
                 valid_freqs = [x.max_frequencies() for x in self.algo_ifs if hasattr(x, 'max_frequencies') and x.max_frequencies() is not None]
                 if valid_freqs:
                     self.max_frequencies = max(valid_freqs)
-            except AttributeError as e: # Should be less likely if sub-algos conform
-                logging.warning(f"Error accessing max_frequencies from a sub-algorithm: {e}")
-        # model.create() removed, should be handled by main application setup
+            except AttributeError as e: # Should be more specific or check hasattr more carefully
+                logging.warning(f"An algorithm without max_frequencies method might be present or max_frequencies returned None: {e}")
+        model.create()
 
     def process(self, db_conn, current_value, currency): # Added db_conn
         """Process data, it returned 1 to buy and -1 to sell."""
@@ -78,9 +78,11 @@ class AlgoMain:
             logging.warning("max_frequencies is 0, not fetching historical values for algo processing.")
 
         total_result = 0
-        indicator_signals = {}
+        indicator_signals = {} # To collect signals from non-AI algos for AIAlgo
+        new_algo_configs = {}  # To store configs from AIAlgo if it runs
 
-        # Process non-AI algorithms first and collect their signals
+        # First pass: Process non-AI algorithms and collect their signals
+        # These signals can be used by AIAlgo
         for algo_instance in self.algo_ifs:
             if not isinstance(algo_instance, AIAlgo):
                 # Sub-algo process methods also need db_conn if they access DB
@@ -94,6 +96,8 @@ class AlgoMain:
                 # AIAlgo's process method will need to be updated to accept db_conn and indicator_signals dict.
                 ai_signal = algo_instance.process(db_conn, current_value, values, currency, indicator_signals)
                 total_result += ai_signal
+                 
+
 
         logging.info('AlgoMain: Total result for %s after all algos: %d', currency, total_result)
         return total_result

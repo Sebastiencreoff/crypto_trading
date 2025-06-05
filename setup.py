@@ -24,7 +24,9 @@ setup(name='crypto_trading',
                         'numpy',
                         'pandas',
                         'requests',
-                        'sqlobject'
+                        'sqlobject',
+                        'psycopg2-binary',
+                        'boto3'
       ],
       tests_require=[
           'nose'

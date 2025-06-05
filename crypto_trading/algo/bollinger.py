@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 # -*- coding:utf-8 -*-
 
-import json
 import logging
 
 from . import model
@@ -16,13 +15,20 @@ class Bollinger(object):
         """Class Initialisation."""
         logging.debug('')
 
-        cfg = json.load(open(config_dict, mode='r'))
+        self.frequency = self.__FREQUENCY__  # Initialize with default
+        algo_specific_config = config_dict.get('Bollinger')
 
-        if cfg.get('Bollinger') is not None:
-            self.frequency = cfg.get('Bollinger').get('frequency',
+        if algo_specific_config is not None:
+            self.frequency = algo_specific_config.get('frequency',
                                                       self.__FREQUENCY__)
 
         logging.info('Bollinger with a frequency at %s', self.frequency)
+
+    def update_config(self, bollinger_params_dict):
+        """Updates the Bollinger configuration."""
+        logging.debug(f"Updating Bollinger configuration with: {bollinger_params_dict}")
+        self.frequency = bollinger_params_dict.get('frequency', self.frequency)
+        logging.info(f"Bollinger configuration updated: frequency={self.frequency}")
 
     def max_frequencies(self):
         return self.frequency
