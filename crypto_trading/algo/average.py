@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 
 from . import model
@@ -21,25 +20,34 @@ class GuppyMMA(object):
         self.short_terms = None
         self.sell = None
 
-        cfg = json.load(open(config_dict, mode='r'))
-        if cfg.get('GuppyMMA') is not None:
+        algo_specific_config = config_dict.get('GuppyMMA')
+        if algo_specific_config is not None:
             self.active = True
             self.short_terms = [i
-                                for i in sorted(cfg.get(
-                                    'GuppyMMA').get('short_term',
-                                                    self.SHORT_TERM_DFT))]
+                                for i in sorted(algo_specific_config.get(
+                                    'short_term',
+                                    self.SHORT_TERM_DFT))]
             self.long_terms = [i
-                               for i in sorted(cfg.get(
-                                    'GuppyMMA').get('long_term',
-                                                    self.LONG_TERM_DFT))]
+                               for i in sorted(algo_specific_config.get(
+                                    'long_term',
+                                    self.LONG_TERM_DFT))]
 
-            self.buy = cfg.get('GuppyMMA').get(
+            self.buy = algo_specific_config.get(
                 'buy', len(self.short_terms))
-            self.sell = cfg.get('GuppyMMA').get(
+            self.sell = algo_specific_config.get(
                 'sell', len(self.short_terms))
 
             logging.info('mean with a frequencies %s',
                          self.short_terms + self.long_terms)
+
+    def update_config(self, guppy_params_dict):
+        """Updates the GuppyMMA configuration."""
+        logging.debug(f"Updating GuppyMMA configuration with: {guppy_params_dict}")
+        self.short_terms = sorted(guppy_params_dict.get('short_term', self.short_terms))
+        self.long_terms = sorted(guppy_params_dict.get('long_term', self.long_terms))
+        self.buy = guppy_params_dict.get('buy', self.buy)
+        self.sell = guppy_params_dict.get('sell', self.sell)
+        logging.info(f"GuppyMMA configuration updated: short_terms={self.short_terms}, long_terms={self.long_terms}, buy={self.buy}, sell={self.sell}")
 
     def max_frequencies(self):
         return max(self.long_terms) if self.long_terms else None
@@ -112,4 +120,3 @@ class GuppyMMA(object):
 
         logging.debug('Nothing to do')
         return 0
-

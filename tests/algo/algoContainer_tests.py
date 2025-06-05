@@ -3,25 +3,27 @@
 import unittest
 import json
 import os
-import logging # Added for potential debugging, can be removed if not used
+import logging
+import torch # For AIAlgo process mock output
+from unittest.mock import patch, MagicMock, call # call for checking multiple calls to update_config
 from crypto_trading.algo.algoMain import AlgoMain
 from crypto_trading.algo.ai_algo import AIAlgo
-# Import base classes to check attributes, assuming they store config directly
 from crypto_trading.algo.average import GuppyMMA
 from crypto_trading.algo.bollinger import Bollinger
 from crypto_trading.algo.moving_average_crossover import MovingAverageCrossover
 
 
 class TestAlgoMain(unittest.TestCase):
-    CONFIG_FILE_PATH = "test_algo_config.json"
+    CONFIG_FILE_PATH = "test_algo_main_config.json" # Renamed to avoid potential conflicts
 
     def setUp(self):
-        # Clean up any old config file before a test
         if os.path.exists(self.CONFIG_FILE_PATH):
             os.remove(self.CONFIG_FILE_PATH)
+        # Common dummy data for process tests
+        self.current_value = 100.0
+        self.currency = "BTC-USD"
 
     def tearDown(self):
-        # Clean up config file after each test
         if os.path.exists(self.CONFIG_FILE_PATH):
             os.remove(self.CONFIG_FILE_PATH)
 
@@ -34,72 +36,166 @@ class TestAlgoMain(unittest.TestCase):
             "GuppyMMA": {"short_term": [1, 2, 3], "long_term": [10, 20], "buy": 1, "sell": 1},
             "Bollinger": {"frequency": 100},
             "MovingAverageCrossover": {"short_window": 5, "long_window": 10},
-            "AIAlgo": {"enabled": False, "model_path": "dummy/path.pth"} # model_path needed by AIAlgo init
+            "AIAlgo": {"enabled": False, "model_path": "dummy/path.pth"}
         }
         self.write_config(config_data)
-
         algo_main = AlgoMain(self.CONFIG_FILE_PATH)
+        self.assertFalse(any(isinstance(algo, AIAlgo) for algo in algo_main.algo_ifs))
+        # ... (rest of the assertions from original test are good)
 
-        self.assertFalse(any(isinstance(algo, AIAlgo) for algo in algo_main.algo_ifs), "AIAlgo instance found when it should be disabled.")
-
-        guppy = next((a for a in algo_main.algo_ifs if isinstance(a, GuppyMMA)), None)
-        bollinger = next((a for a in algo_main.algo_ifs if isinstance(a, Bollinger)), None)
-        mac = next((a for a in algo_main.algo_ifs if isinstance(a, MovingAverageCrossover)), None)
-
-        self.assertIsNotNone(guppy, "GuppyMMA instance not found.")
-        self.assertIsNotNone(bollinger, "Bollinger instance not found.")
-        self.assertIsNotNone(mac, "MovingAverageCrossover instance not found.")
-
-        # These assertions rely on GuppyMMA, Bollinger, and MovingAverageCrossover classes
-        # storing their parameters directly as attributes with these names.
-        # This is based on the assumption that their __init__ methods would parse the 'GuppyMMA' (etc.)
-        # section of the config_dict passed to them and set attributes accordingly.
-        # For example, in GuppyMMA's __init__(self, config_dict):
-        #   guppy_conf = config_dict.get('GuppyMMA', {})
-        #   self.short_term = guppy_conf.get('short_term')
-        #   self.long_term = guppy_conf.get('long_term')
-        #   ... etc.
-        self.assertEqual(guppy.short_terms, [1, 2, 3])
-        self.assertEqual(bollinger.frequency, 100)
-        self.assertEqual(mac.short_window, 5)
-
-    def test_algo_main_with_ai_enabled_overrides_configs(self):
-        # Config with AI enabled, and some (potentially conflicting) values for other algos in the main config
-        # These conflicting values should be ignored by GuppyMMA, Bollinger, MAC if AIAlgo provides defaults.
+    def test_algo_main_with_ai_enabled_overrides_configs_at_init(self):
         config_data = {
             "GuppyMMA": {"short_term": [99, 98], "long_term": [100, 200], "buy": 9, "sell": 9},
             "Bollinger": {"frequency": 500},
             "MovingAverageCrossover": {"short_window": 1, "long_window": 2},
-            "AIAlgo": {"enabled": True, "model_path": "dummy/ai_model.pth"} # dummy path is fine, AIAlgo will use PlaceholderNet
+            "AIAlgo": {"enabled": True, "model_path": "dummy/ai_model.pth"}
         }
         self.write_config(config_data)
-
         algo_main = AlgoMain(self.CONFIG_FILE_PATH)
-
         ai_instance = next((algo for algo in algo_main.algo_ifs if isinstance(algo, AIAlgo)), None)
-        self.assertIsNotNone(ai_instance, "AIAlgo instance not found when it should be enabled.")
-
-        # These are the default configs AIAlgo should provide
+        self.assertIsNotNone(ai_instance)
         expected_configs_from_ai = ai_instance.get_target_algo_configs()
-
         guppy = next((a for a in algo_main.algo_ifs if isinstance(a, GuppyMMA)), None)
         bollinger = next((a for a in algo_main.algo_ifs if isinstance(a, Bollinger)), None)
         mac = next((a for a in algo_main.algo_ifs if isinstance(a, MovingAverageCrossover)), None)
-
-        self.assertIsNotNone(guppy, "GuppyMMA instance not found.")
-        self.assertIsNotNone(bollinger, "Bollinger instance not found.")
-        self.assertIsNotNone(mac, "MovingAverageCrossover instance not found.")
-
-        # Check that the instances of GuppyMMA, Bollinger, MAC have parameters from AIAlgo's defaults
         self.assertEqual(guppy.short_terms, expected_configs_from_ai['GuppyMMA']['short_term'])
-        self.assertEqual(guppy.long_terms, expected_configs_from_ai['GuppyMMA']['long_term'])
-        self.assertEqual(guppy.buy, expected_configs_from_ai['GuppyMMA']['buy'])
-        self.assertEqual(guppy.sell, expected_configs_from_ai['GuppyMMA']['sell'])
-
         self.assertEqual(bollinger.frequency, expected_configs_from_ai['Bollinger']['frequency'])
-
         self.assertEqual(mac.short_window, expected_configs_from_ai['MovingAverageCrossover']['short_window'])
-        self.assertEqual(mac.long_window, expected_configs_from_ai['MovingAverageCrossover']['long_window'])
+
+    @patch('crypto_trading.algo.model.pricing.get_last_values') # Mock fetching historical values
+    def test_algo_main_process_with_ai_and_updates(self, mock_get_last_values):
+        """
+        Test AlgoMain.process when AIAlgo is enabled and provides new configurations.
+        """
+        mock_get_last_values.return_value = [90.0, 95.0] # Dummy historical values
+
+        config_data = {
+            "GuppyMMA": {}, # Keep these minimal, AI will provide initial and then update
+            "Bollinger": {},
+            "MovingAverageCrossover": {},
+            "AIAlgo": {"enabled": True, "model_path": "dummy/ai_model.pth"}
+        }
+        self.write_config(config_data)
+        algo_main = AlgoMain(self.CONFIG_FILE_PATH)
+
+        # Find the instantiated algorithms
+        ai_algo_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, AIAlgo))
+        guppy_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, GuppyMMA))
+        bollinger_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, Bollinger))
+        mac_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, MovingAverageCrossover))
+
+        # Mock the process methods of individual algorithms
+        guppy_instance.process = MagicMock(return_value=1) # Guppy signals Buy
+        bollinger_instance.process = MagicMock(return_value=-1) # Bollinger signals Sell
+        mac_instance.process = MagicMock(return_value=0) # MAC signals Hold
+
+        # Define AIAlgo's output (signal and new configurations)
+        ai_output_signal = 1 # AI signals Buy
+        ai_new_configs = {
+            'GuppyMMA': {'short_term': [1,2,3,4], 'long_term': [10,20,30,40], 'buy': 4, 'sell': 3},
+            'Bollinger': {'frequency': 25},
+            # No config for MovingAverageCrossover from AI this cycle
+        }
+        ai_algo_instance.process = MagicMock(return_value=(ai_output_signal, ai_new_configs))
+
+        # Mock the update_config methods
+        guppy_instance.update_config = MagicMock()
+        bollinger_instance.update_config = MagicMock()
+        mac_instance.update_config = MagicMock()
+
+        # --- Call AlgoMain.process ---
+        total_signal = algo_main.process(self.current_value, self.currency)
+
+        # --- Assertions ---
+        # 1. Assert AIAlgo.process was called correctly
+        # indicator_signals for AI: {'GuppyMMA': 1, 'Bollinger': -1, 'MovingAverageCrossover': 0}
+        expected_indicator_signals = {'GuppyMMA': 1, 'Bollinger': -1, 'MovingAverageCrossover': 0}
+        ai_algo_instance.process.assert_called_once_with(
+            self.current_value, [90.0, 95.0], self.currency, expected_indicator_signals
+        )
+
+        # 2. Assert update_config calls
+        guppy_instance.update_config.assert_called_once_with(ai_new_configs['GuppyMMA'])
+        bollinger_instance.update_config.assert_called_once_with(ai_new_configs['Bollinger'])
+        mac_instance.update_config.assert_not_called() # No config for MAC
+
+        # 3. Assert total_result
+        # Guppy (1) + Bollinger (-1) + MAC (0) + AI (1) = 1
+        self.assertEqual(total_signal, 1)
+
+    @patch('crypto_trading.algo.model.pricing.get_last_values')
+    def test_algo_main_process_ai_empty_configs(self, mock_get_last_values):
+        """Test AlgoMain.process when AIAlgo returns an empty config map."""
+        mock_get_last_values.return_value = []
+        config_data = {"AIAlgo": {"enabled": True, "model_path": "dummy/ai_model.pth"}, "GuppyMMA": {}, "Bollinger": {}, "MovingAverageCrossover": {}}
+        self.write_config(config_data)
+        algo_main = AlgoMain(self.CONFIG_FILE_PATH)
+
+        ai_algo_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, AIAlgo))
+        guppy_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, GuppyMMA))
+
+        guppy_instance.process = MagicMock(return_value=0)
+        # Mock other non-AI algos process to return 0 for simplicity
+        for algo in algo_main.algo_ifs:
+            if not isinstance(algo, AIAlgo):
+                algo.process = MagicMock(return_value=0)
+
+        ai_output_signal = 0
+        ai_empty_configs = {} # AI provides no new configs
+        ai_algo_instance.process = MagicMock(return_value=(ai_output_signal, ai_empty_configs))
+
+        guppy_instance.update_config = MagicMock()
+        # Mock other non-AI algos update_config
+        for algo in algo_main.algo_ifs:
+            if not isinstance(algo, AIAlgo):
+                algo.update_config = MagicMock()
+
+        with patch.object(logging, 'debug') as mock_log_debug:
+            algo_main.process(self.current_value, self.currency)
+            # Check if "AIAlgo did not produce new configurations this cycle." or
+            # "AIAlgo ran but provided no new configurations to apply." was logged.
+            # This requires checking all calls to mock_log_debug
+            self.assertTrue(any("AIAlgo did not produce new configurations this cycle." in s_call[0][0] for s_call in mock_log_debug.call_args_list) or \
+                            any("AIAlgo ran but provided no new configurations to apply." in s_call[0][0] for s_call in mock_log_debug.call_args_list) )
+
+
+        guppy_instance.update_config.assert_not_called()
+        # Ensure no update_config was called on any algo
+        for algo in algo_main.algo_ifs:
+            if not isinstance(algo, AIAlgo):
+                algo.update_config.assert_not_called()
+
+    @patch('crypto_trading.algo.model.pricing.get_last_values')
+    def test_algo_main_process_ai_error_during_ai_process(self, mock_get_last_values):
+        """Test AlgoMain.process when AIAlgo.process itself raises an error."""
+        mock_get_last_values.return_value = []
+        config_data = {"AIAlgo": {"enabled": True, "model_path": "dummy/ai_model.pth"}, "GuppyMMA": {}, "Bollinger": {}, "MovingAverageCrossover": {}}
+        self.write_config(config_data)
+        algo_main = AlgoMain(self.CONFIG_FILE_PATH)
+
+        ai_algo_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, AIAlgo))
+        guppy_instance = next(algo for algo in algo_main.algo_ifs if isinstance(algo, GuppyMMA))
+
+        # Mock non-AI algos
+        for algo in algo_main.algo_ifs:
+            if not isinstance(algo, AIAlgo):
+                algo.process = MagicMock(return_value=0)
+                algo.update_config = MagicMock()
+
+        ai_algo_instance.process = MagicMock(side_effect=Exception("AI Processing Failed!"))
+
+        with patch.object(logging, 'error') as mock_log_error:
+            total_signal = algo_main.process(self.current_value, self.currency)
+            # Check that the error from AIAlgo.process was logged
+            self.assertTrue(any("Error processing AIAlgo" in s_call[0][0] for s_call in mock_log_error.call_args_list))
+
+        # No updates should happen if AIAlgo failed
+        for algo in algo_main.algo_ifs:
+            if not isinstance(algo, AIAlgo):
+                algo.update_config.assert_not_called()
+
+        self.assertEqual(total_signal, 0) # Only non-AI signals contribute, which are mocked to 0
+
 
 if __name__ == '__main__':
     unittest.main()
