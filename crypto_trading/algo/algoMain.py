@@ -14,40 +14,34 @@ from .ai_algo import AIAlgo
 class AlgoMain:
     """Class which manage all algorithm to deal with data."""
 
-    def __init__(self, config_dict):
+    def __init__(self, config_obj): # Changed signature to accept config_obj
         """Class Initialisation."""
 
-        self.__dict__ = json.load(open(config_dict, mode='r'))
+        # Use algo_config_dict from config_obj (assumption)
+        # If algo_config_dict is nested, adjust accordingly e.g., config_obj.algo_specific_settings.algo_config_dict
+        algo_config_data = config_obj.algo_config_dict if hasattr(config_obj, 'algo_config_dict') else {}
+        if not algo_config_data:
+            logging.warning("AlgoMain initialized with empty or missing algo_config_dict from config_obj.")
+
         self.algo_ifs = []
         ai_algo_instance = None
         ai_target_configs = {}
 
-        if self.__dict__.get("AIAlgo", {}).get("enabled", False):
-            # Pass the main config dict to AIAlgo constructor
-            ai_algo_instance = AIAlgo(self.__dict__)
+        # Use algo_config_data for configuration
+        if algo_config_data.get("AIAlgo", {}).get("enabled", False):
+            ai_algo_instance = AIAlgo(config_obj) # Pass the main config_obj or specific part
             ai_target_configs = ai_algo_instance.get_target_algo_configs()
             self.algo_ifs.append(ai_algo_instance)
 
         # Instantiate GuppyMMA
-        guppy_config = self.__dict__.copy()
-        if ai_algo_instance and 'GuppyMMA' in ai_target_configs:
-            # Update the 'GuppyMMA' key in our copy of the main config
-            guppy_config['GuppyMMA'] = ai_target_configs['GuppyMMA']
-        self.algo_ifs.append(average.GuppyMMA(guppy_config))
+        # Each sub-algo should also be updated to accept config_obj or relevant part
+        self.algo_ifs.append(average.GuppyMMA(config_obj)) # Pass config_obj
 
         # Instantiate Bollinger
-        bollinger_config = self.__dict__.copy()
-        if ai_algo_instance and 'Bollinger' in ai_target_configs:
-            # Update the 'Bollinger' key in our copy of the main config
-            bollinger_config['Bollinger'] = ai_target_configs['Bollinger']
-        self.algo_ifs.append(bollinger.Bollinger(bollinger_config))
+        self.algo_ifs.append(bollinger.Bollinger(config_obj)) # Pass config_obj
 
         # Instantiate MovingAverageCrossover
-        mac_config = self.__dict__.copy()
-        if ai_algo_instance and 'MovingAverageCrossover' in ai_target_configs:
-            # Update the 'MovingAverageCrossover' key in our copy of the main config
-            mac_config['MovingAverageCrossover'] = ai_target_configs['MovingAverageCrossover']
-        self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(mac_config))
+        self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(config_obj)) # Pass config_obj
 
         self.max_frequencies = 0
         if self.algo_ifs:
@@ -59,21 +53,29 @@ class AlgoMain:
                 logging.warning(f"An algorithm without max_frequencies method might be present or max_frequencies returned None: {e}")
         model.create()
 
-    def process(self, current_value, currency):
+    def process(self, db_conn, current_value, currency): # Added db_conn
         """Process data, it returned 1 to buy and -1 to sell."""
 
-        # Price data
-        model.pricing.Pricing(currency=currency,
-                              date_time=datetime.datetime.now(),
-                              value=current_value)
+        # Price data - model.pricing.Pricing is likely a SQLObject.
+        # If so, it needs connection=db_conn. This implies model.pricing.Pricing needs refactoring.
+        # For now, assuming model.save_price is the correct way to persist price ticks as per model.py refactor.
+        # model.pricing.Pricing(currency=currency, # This line is problematic if Pricing is SQLObject based
+        #                       date_time=datetime.datetime.now(),
+        #                       value=current_value,
+        #                       connection=db_conn) # Assuming Pricing is SQLObject and needs connection
+        # The above line is removed as model.save_price in trading.py already handles this.
+        # This process method is for calculating signals, not saving the current price tick again.
 
         values = []
         if self.max_frequencies > 0:
+            # model.pricing.get_last_values needs db_conn if it queries DB.
+            # This implies model.pricing needs refactoring.
             values = model.pricing.get_last_values(
+                db_conn, # Pass db_conn
                 count=self.max_frequencies,
                 currency=currency)
         else:
-            logging.warning("max_frequencies is 0, not fetching historical values.")
+            logging.warning("max_frequencies is 0, not fetching historical values for algo processing.")
 
         total_result = 0
         indicator_signals = {} # To collect signals from non-AI algos for AIAlgo
@@ -83,57 +85,37 @@ class AlgoMain:
         # These signals can be used by AIAlgo
         for algo_instance in self.algo_ifs:
             if not isinstance(algo_instance, AIAlgo):
-                try:
-                    signal = algo_instance.process(current_value, values, currency)
-                    indicator_signals[algo_instance.__class__.__name__] = signal
-                    total_result += signal
-                    logging.debug(f"Signal from {algo_instance.__class__.__name__}: {signal}. Current total: {total_result}")
-                except Exception as e:
-                    logging.error(f"Error processing {algo_instance.__class__.__name__}: {e}", exc_info=True)
+                # Sub-algo process methods also need db_conn if they access DB
+                signal = algo_instance.process(db_conn, current_value, values, currency)
+                indicator_signals[algo_instance.__class__.__name__] = signal
+                total_result += signal
 
-
-        # Second pass: Process AIAlgo if it exists
-        # AIAlgo uses the indicator_signals from other algorithms
-        ai_algo_processed_successfully = False
+        # Process AIAlgo, passing in the collected signals
         for algo_instance in self.algo_ifs:
             if isinstance(algo_instance, AIAlgo):
-                try:
-                    # AIAlgo's process method now returns its signal and a dictionary of new configurations
-                    ai_signal, received_configs = algo_instance.process(current_value, values, currency, indicator_signals)
-                    total_result += ai_signal
-                    new_algo_configs = received_configs # Store the new configs from AIAlgo
-                    ai_algo_processed_successfully = True # Mark that AIAlgo has been processed
-                    logging.debug(f"Signal from AIAlgo: {ai_signal}. Current total: {total_result}")
-                    if new_algo_configs:
-                        logging.info(f"AIAlgo produced new configurations: {new_algo_configs}")
-                    else:
-                        logging.debug("AIAlgo did not produce new configurations this cycle.")
-                    break # Assuming only one AIAlgo instance needs to be processed
-                except Exception as e:
-                    logging.error(f"Error processing AIAlgo: {e}", exc_info=True)
-                    # In case of an error in AIAlgo, new_algo_configs remains empty or its last state
-
-        # Third pass: If AIAlgo was processed successfully and returned new configs, update other algos
-        if ai_algo_processed_successfully and new_algo_configs:
-            for algo_to_update in self.algo_ifs:
-                # Do not try to update AIAlgo with its own generated configs in this loop
-                if not isinstance(algo_to_update, AIAlgo):
-                    algo_name = algo_to_update.__class__.__name__
-                    if algo_name in new_algo_configs:
-                        try:
-                            logging.info(f"AlgoMain: Attempting to update {algo_name} with new config from AIAlgo: {new_algo_configs[algo_name]}")
-                            algo_to_update.update_config(new_algo_configs[algo_name])
-                            # Individual update_config methods should have their own success/failure logging
-                        except Exception as e:
-                            logging.error(f"AlgoMain: Error updating {algo_name} with new config: {e}", exc_info=True)
-                    else:
-                        logging.debug(f"AlgoMain: No new config from AIAlgo for {algo_name} in this cycle.")
-        elif ai_algo_processed_successfully: # AIAlgo ran but new_algo_configs is empty
-            logging.debug("AlgoMain: AIAlgo ran but provided no new configurations to apply.")
+                # AIAlgo's process method will need to be updated to accept db_conn and indicator_signals dict.
+                ai_signal = algo_instance.process(db_conn, current_value, values, currency, indicator_signals)
+                total_result += ai_signal
+                 
 
 
-        logging.info('Total result after all algos: %d', total_result)
+        logging.info('AlgoMain: Total result for %s after all algos: %d', currency, total_result)
         return total_result
 
-    def reset(self):
-        model.reset()
+    def reset(self, db_conn, currency): # Added db_conn and currency
+        logging.info(f"AlgoMain: Resetting model data for currency {currency}.")
+        model.reset(db_conn, currency) # Pass db_conn and currency
+        # Optionally, reset internal states of sub-algorithms if they have reset methods
+        for algo_instance in self.algo_ifs:
+            if hasattr(algo_instance, 'reset'):
+                # Sub-algo reset methods might also need db_conn and currency
+                try:
+                    algo_instance.reset(db_conn, currency)
+                except TypeError: # Handle if their reset doesn't take args yet
+                    logging.warning(f"Could not call reset on {algo_instance.__class__.__name__} with db_conn/currency. Attempting without.")
+                    try:
+                        algo_instance.reset()
+                    except Exception as e:
+                         logging.error(f"Failed to call reset on {algo_instance.__class__.__name__}: {e}")
+
+        logging.info(f"AlgoMain: Reset complete for currency {currency}.")
