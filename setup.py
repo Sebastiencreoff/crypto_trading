@@ -27,7 +27,8 @@ setup(name='crypto_trading',
                         'sqlobject',
                         'psycopg2-binary',
                         'boto3',
-                        'python-binance>=1.0.16'
+                        'slack_sdk[rtm]', # Ensure RTM dependencies like aiohttp are included
+                        'matplotlib'
       ],
       tests_require=[
           'nose'
