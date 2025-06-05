@@ -1,24 +1,4 @@
 {
-  "GuppyMMA": {
-    "short_term": [
-      3,
-      5,
-      8,
-      10,
-      12,
-      15
-    ],
-    "long_term": [
-      30,
-      35,
-      40,
-      45,
-      50,
-      60
-    ],
-    "buy": 6,
-    "sell": 6
-  },
   "maxLost": {
     "percentage": 3,
     "percentage_update": 0.25,
@@ -26,13 +6,6 @@
   },
   "takeProfit": {
     "percentage": 5.0
-  },
-  "Bollinger": {
-    "frequency": 289
-  },
-  "MovingAverageCrossover": {
-    "short_window": 20,
-    "long_window": 50
   },
   "AIAlgo": {
     "enabled": true,

@@ -98,5 +98,26 @@ class TestAIAlgo(unittest.TestCase):
         signal = algo_no_path.process(self.current_value, self.sufficient_values, self.currency, self.full_indicator_signals)
         self.assertIn(signal, [-1, 0, 1], "Signal should be -1, 0, or 1 even if model_path key is missing")
 
+    def test_get_target_algo_configs(self):
+        """
+        Tests the get_target_algo_configs method for correct structure and default values.
+        """
+        configs = self.ai_algo.get_target_algo_configs()
+        self.assertIsInstance(configs, dict)
+
+        expected_keys = ['GuppyMMA', 'Bollinger', 'MovingAverageCrossover']
+        for key in expected_keys:
+            self.assertIn(key, configs)
+            self.assertIsInstance(configs[key], dict)
+
+        # Assert specific default values
+        self.assertEqual(configs['GuppyMMA']['short_term'], [3, 5, 8, 10, 12, 15])
+        self.assertEqual(configs['GuppyMMA']['long_term'], [30, 35, 40, 45, 50, 60])
+        self.assertEqual(configs['GuppyMMA']['buy'], 6)
+        self.assertEqual(configs['GuppyMMA']['sell'], 6)
+        self.assertEqual(configs['Bollinger']['frequency'], 289)
+        self.assertEqual(configs['MovingAverageCrossover']['short_window'], 20)
+        self.assertEqual(configs['MovingAverageCrossover']['long_window'], 50)
+
 if __name__ == '__main__':
     unittest.main()
