@@ -1,19 +1,23 @@
 # -*- coding:utf-8 -*-
 
 import pytest
+import os # Added import for os, was missing
 
 import crypto_trading.connection as connection
 
-TEST_DIR = os.path.realpath(os.path.dirname(__file__))
-COINBASE_FILE = os.path.join(TEST_DIR, 'inputs', 'coinbase.json')
+# TEST_DIR and COINBASE_FILE are no longer needed for Coinbase
+# TEST_DIR = os.path.realpath(os.path.dirname(__file__))
+# COINBASE_FILE = os.path.join(TEST_DIR, 'inputs', 'coinbase.json')
 
-@pytest.fixture()
-def coinbase_file(tmpdir):
-    f = tmpdir.mkdir('config').join('coinbase.json')
+# Removed coinbase_file fixture
+# @pytest.fixture()
+# def coinbase_file(tmpdir):
+#     f = tmpdir.mkdir('config').join('coinbase.json')
 
-@pytest.fixture()
-def coinbase_factory(coinbase_file):
-    return connection.coinBase.CoinBaseConnect(COINBASE_FILE)
+# Removed coinbase_factory fixture
+# @pytest.fixture()
+# def coinbase_factory(coinbase_file):
+#     return connection.coinBase.CoinBaseConnect(COINBASE_FILE)
 
 
 @pytest.fixture()

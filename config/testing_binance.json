@@ -1,0 +1,9 @@
+{
+    "database_file": "TEST_BINANCE_TRADES",
+    "currency": "BTCUSDT",
+    "transactionAmt": 100,
+    "delay": 1,
+    "connection": "binance",
+    "connectionConfig": "config/testing_binance_api.json",
+    "algoConfig": "config/algo.json"
+}

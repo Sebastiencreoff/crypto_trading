@@ -13,6 +13,52 @@ This project provides a framework for implementing and running various trading a
 2. Install dependencies: `pip install -r requirements.txt` (Note: `requirements.txt` may need to be created or updated).
 3. Configure your trading parameters and API keys in the relevant configuration files.
 
+## Exchange Configuration
+
+This section details how to configure the bot to connect to different cryptocurrency exchanges. Currently, Binance is the primary supported exchange for live/API-based trading. Simulation mode is also available.
+
+### Binance
+Binance is a supported exchange for trading. Configuration involves two main files:
+
+1.  **`config/trading_BINANCE.json`**: This file defines the trading strategy parameters for Binance, such as the currency pair (e.g., `BTCUSDT`), transaction amounts, and which algorithm configurations to use.
+2.  **`config/binance.json`**: This file stores your Binance API credentials and a simulation flag.
+
+**Setup Instructions for Binance:**
+
+1.  **Create API Key File**:
+    You will need to create a `config/binance.json` file. You can do this by copying the example template:
+    ```bash
+    cp config/testing_binance_api.json config/binance.json
+    ```
+    Then, edit `config/binance.json`.
+
+2.  **Add Your API Credentials**:
+    In your newly created `config/binance.json`, replace `"YOUR_BINANCE_API_KEY"` and `"YOUR_BINANCE_API_SECRET"` with your actual Binance API key and secret.
+
+    ```json
+    {
+        "api_key": "YOUR_ACTUAL_BINANCE_API_KEY",
+        "api_secret": "YOUR_ACTUAL_BINANCE_API_SECRET",
+        "simulation": true
+    }
+    ```
+
+3.  **Verify Trading Configuration**:
+    Ensure the `connectionConfig` path in `config/trading_BINANCE.json` correctly points to your API key file. The default is `"config/binance.json"`, so if you named your API key file `binance.json` and placed it in the `config/` directory, this should already be correct.
+    ```json
+    // In config/trading_BINANCE.json
+    {
+        // ... other settings ...
+        "connection": "binance",
+        "connectionConfig": "config/binance.json", // Make sure this points to your API key file
+        // ... other settings ...
+    }
+    ```
+
+4.  **Simulation Mode**:
+    -   Set `"simulation": false` in `config/binance.json` for live trading with real funds.
+    -   Set `"simulation": true` for simulated trading. The current `BinanceConnect` implementation uses the live Binance API endpoints. If `simulation` is true, it doesn't explicitly use Binance's testnet. The `python-binance` library itself might support testnet environments if API keys for a testnet account are provided and the library is configured accordingly, but `BinanceConnect` does not manage this switch automatically. For true paper trading without hitting live endpoints with dummy orders, ensure the library is configured for testnet or use a dedicated simulation mode if the connector supports it. *Developer Note: The current `BinanceConnect` does not have explicit testnet endpoint switching logic; this relies on how `python-binance` handles keys that might be for a testnet account.*
+
 ## Algorithms
 
 ### Guppy Multiple Moving Average (GuppyMMA)
