@@ -19,12 +19,35 @@ class AlgoMain:
 
         self.__dict__ = json.load(open(config_dict, mode='r'))
         self.algo_ifs = []
-        self.algo_ifs.append(average.GuppyMMA(config_dict))
-        self.algo_ifs.append(bollinger.Bollinger(config_dict))
-        self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(config_dict))
+        ai_algo_instance = None
+        ai_target_configs = {}
 
         if self.__dict__.get("AIAlgo", {}).get("enabled", False):
-            self.algo_ifs.append(AIAlgo(self.__dict__))
+            # Pass the main config dict to AIAlgo constructor
+            ai_algo_instance = AIAlgo(self.__dict__)
+            ai_target_configs = ai_algo_instance.get_target_algo_configs()
+            self.algo_ifs.append(ai_algo_instance)
+
+        # Instantiate GuppyMMA
+        guppy_config = self.__dict__.copy()
+        if ai_algo_instance and 'GuppyMMA' in ai_target_configs:
+            # Update the 'GuppyMMA' key in our copy of the main config
+            guppy_config['GuppyMMA'] = ai_target_configs['GuppyMMA']
+        self.algo_ifs.append(average.GuppyMMA(guppy_config))
+
+        # Instantiate Bollinger
+        bollinger_config = self.__dict__.copy()
+        if ai_algo_instance and 'Bollinger' in ai_target_configs:
+            # Update the 'Bollinger' key in our copy of the main config
+            bollinger_config['Bollinger'] = ai_target_configs['Bollinger']
+        self.algo_ifs.append(bollinger.Bollinger(bollinger_config))
+
+        # Instantiate MovingAverageCrossover
+        mac_config = self.__dict__.copy()
+        if ai_algo_instance and 'MovingAverageCrossover' in ai_target_configs:
+            # Update the 'MovingAverageCrossover' key in our copy of the main config
+            mac_config['MovingAverageCrossover'] = ai_target_configs['MovingAverageCrossover']
+        self.algo_ifs.append(moving_average_crossover.MovingAverageCrossover(mac_config))
 
         self.max_frequencies = 0
         if self.algo_ifs:

@@ -25,6 +25,25 @@ class AIAlgo(AlgoIf):
 
     def __init__(self, config_dict):
         super().__init__(config_dict)
+        self.algo_configs = {}
+
+        # Populate default algo_configs
+        # These values are typically loaded from a config file (e.g., algo.json)
+        # but here we are setting them as coded defaults for AIAlgo's internal reference
+        self.algo_configs['GuppyMMA'] = {
+            "short_term": [3, 5, 8, 10, 12, 15],
+            "long_term": [30, 35, 40, 45, 50, 60],
+            "buy": 6,
+            "sell": 6
+        }
+        self.algo_configs['Bollinger'] = {
+            "frequency": 289
+        }
+        self.algo_configs['MovingAverageCrossover'] = {
+            "short_window": 20,
+            "long_window": 50
+        }
+
         self.model = None
         self.expected_input_size = self.NUM_PRICE_FEATURES + len(self.TARGET_INDICATOR_KEYS)
 
@@ -139,3 +158,6 @@ class AIAlgo(AlgoIf):
         except Exception as e:
             logging.error(f"Error during AIAlgo process: {e}")
             return 0 # Neutral signal on error
+
+    def get_target_algo_configs(self):
+        return self.algo_configs
