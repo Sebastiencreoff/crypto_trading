@@ -8,10 +8,11 @@ from typing import Optional # Dict might be removed if active_tasks is gone
 # Adjust imports based on project structure
 # Assuming config_management, trading_service, crypto_trading are top-level or in PYTHONPATH
 from config_management.loader import load_config # May not be needed if app_config is sole source
-from config_management.schemas import AppConfig, ExchangeConfig, AlgoConfig
+from config_management.schemas import AppConfig, ExchangeConfig, AlgoConfig, SlackConfig
 from crypto_trading.database.core_operations import get_session as get_db_session_from_engine # Renamed to avoid conflict
 from crypto_trading.config import init as init_global_config, app_config as global_app_config # For DB engine init
 from crypto_trading.task_manager import TaskManager # New import
+from .slack_client import SlackNotifier # Moved from notification_service
 
 from .models import CreateTaskRequest, TaskStatusResponse, TaskCreateResponse, TaskStopResponse, TaskProfitResponse, TaskResetResponse # Removed TaskInfo
 
@@ -19,6 +20,7 @@ import os # Added for environment variable access
 
 # --- Globals / App State ---
 task_manager_instance: Optional[TaskManager] = None
+slack_notifier_instance: Optional[SlackNotifier] = None # For Slack notifications
 app_config: Optional[AppConfig] = None # Loaded config
 
 # Configure basic logging
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 # --- FastAPI App Lifespan (Startup/Shutdown) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global app_config, task_manager_instance
+    global app_config, task_manager_instance, slack_notifier_instance
     logger.info("FastAPI application starting up...")
     # Load configuration
     config_file_path = os.environ.get("APP_CONFIG_FILE_PATH")
@@ -50,6 +52,17 @@ async def lifespan(app: FastAPI):
         task_manager_instance = TaskManager()
         logger.info("TaskManager initialized.")
 
+        # Initialize SlackNotifier if Slack config is present
+        if app_config.slack:
+            logger.info("Slack configuration found, initializing SlackNotifier...")
+            slack_notifier_instance = SlackNotifier(slack_config=app_config.slack)
+            if slack_notifier_instance.client:
+                logger.info("SlackNotifier initialized successfully.")
+            else:
+                logger.warning("SlackNotifier initialization failed (client not available). Check SLACK_BOT_TOKEN and config.")
+        else:
+            logger.info("No Slack configuration found in app_config. SlackNotifier will not be initialized.")
+
     except Exception as e:
         logger.error(f"Critical error during application startup: {e}", exc_info=True)
         raise
@@ -66,6 +79,24 @@ app = FastAPI(title="Trading Service", version="0.1.0", lifespan=lifespan)
 # The get_db_session function is removed as endpoints now rely on TaskManager
 # or are not implemented. TaskManager tasks will handle their own DB sessions.
 # The global DB engine is initialized in lifespan via crypto_trading.config.init_global_config.
+
+# --- Utility Functions ---
+def send_slack_notification(message: str, channel_id: Optional[str] = None) -> bool:
+    """
+    Sends a notification message via Slack using the global notifier instance.
+    This is a synchronous wrapper suitable for use from threaded code.
+    """
+    if not slack_notifier_instance:
+        logger.warning("Attempted to send Slack notification, but SlackNotifier is not initialized.")
+        return False
+
+    # The actual SlackNotifier.send_message is synchronous.
+    success = slack_notifier_instance.send_message(message=message, channel_id=channel_id)
+    if success:
+        logger.info(f"Successfully sent Slack message: {message[:50]}...")
+    else:
+        logger.error(f"Failed to send Slack message: {message[:50]}...")
+    return success
 
 # --- API Endpoints ---
 
@@ -278,6 +309,21 @@ async def reset_task_state(task_id: str):
     logger.warning(f"Endpoint /tasks/{task_id}/reset is not implemented with TaskManager.")
     raise HTTPException(status_code=501, detail="Not Implemented")
 
+@app.post("/debug/notify", status_code=200, include_in_schema=True) # include_in_schema for testing
+async def debug_send_notification(message: str, channel_id: Optional[str] = None):
+    """
+    Debug endpoint to test Slack notifications.
+    Requires SlackNotifier to be initialized.
+    """
+    if not slack_notifier_instance:
+        raise HTTPException(status_code=503, detail="SlackNotifier not initialized.")
+
+    # Call the synchronous version
+    success = send_slack_notification(message, channel_id)
+    if success:
+        return {"status": "success", "message": "Notification sent."}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send notification.")
 
 if __name__ == "__main__":
     # This is for local debugging. For deployment, use Uvicorn directly.

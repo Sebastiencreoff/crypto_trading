@@ -33,10 +33,7 @@ Homepage = "https://github.com/Sebastiencreoff/pythonTrading"
 
 [tool.setuptools]
 package_dir = {"" = "../code"}
-packages = ["crypto_trading", "config_management", "notification_service", "trading_service"]
-
-[project.scripts]
-trading = "crypto_trading.main:main"
+packages = ["crypto_trading", "config_management", "trading_service"]
 
 [project.optional-dependencies]
 test = [

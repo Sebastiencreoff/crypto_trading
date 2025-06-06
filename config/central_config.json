@@ -41,6 +41,5 @@
         "transaction_amount": 100,
         "delay_seconds": 60,
         "initial_capital": 0.0
-    },
-    "notification_service_url": "http://notification-service-svc:8001"
+    }
 }

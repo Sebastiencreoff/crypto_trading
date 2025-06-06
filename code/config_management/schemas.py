@@ -49,8 +49,6 @@ class AppConfig(BaseModel):
     other_settings: Optional[Dict] = None
     # Define a base path for resolving relative paths in config
     base_config_path: Optional[DirectoryPath] = None
-    # URL for the notification service
-    notification_service_url: Optional[HttpUrl] = None
 
     if IS_PYDANTIC_V2:
         model_config = SettingsConfigDict(extra='ignore')

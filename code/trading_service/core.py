@@ -3,7 +3,7 @@ import time
 import datetime
 import threading
 import queue
-import httpx # Added for sending notifications
+# import httpx # No longer needed for notifications here
 from typing import Optional # Added for task_id_for_log type hint.
 
 # Assuming new config management is in a package accessible via PYTHONPATH
@@ -18,36 +18,15 @@ from crypto_trading.database.core_operations import get_total_profit
 from crypto_trading import algo
 from crypto_trading import connection
 
+# Import the new synchronous notification function from trading_service.main
+# This creates a slight coupling but is necessary if Trading tasks are to use the centralized notifier.
+# An alternative would be to pass the notifier instance or a notification function to Trading __init__.
+from trading_service.main import send_slack_notification
+
+
 logger_core = logging.getLogger(__name__) # Renamed to avoid conflict with Trading.logger
 
-# --- Notification Helper ---
-def _send_notification_sync(message: str, notification_url: Optional[str], task_id_for_log: Optional[str] = "N/A"):
-    """
-    Synchronously sends a notification message to the notification service.
-    A task_id can be provided for more contextual logging.
-    """
-    if not notification_url:
-        logger_core.warning(f"Task {task_id_for_log}: Notification service URL not configured. Cannot send notification: '{message[:50]}...'")
-        return
-
-    try:
-        # NotificationRequest schema: {"message": str, "channel_id": Optional[str]}
-        # Sending to default channel, so channel_id is not specified.
-        payload = {"message": message}
-
-        # Increased timeout, default is 5s, might be too short for service-to-service over k8s network sometimes
-        with httpx.Client(timeout=10.0) as client:
-            response = client.post(f"{notification_url}/notify", json=payload)
-
-        if response.status_code == 200: # Assuming Notification Service returns 200 on success
-            logger_core.info(f"Task {task_id_for_log}: Notification sent successfully: '{message[:50]}...'")
-        else:
-            logger_core.error(f"Task {task_id_for_log}: Failed to send notification. Status: {response.status_code}, Response: {response.text[:100]}")
-    except httpx.RequestError as e:
-        logger_core.error(f"Task {task_id_for_log}: HTTP request error sending notification to {notification_url}/notify: {e}", exc_info=True)
-    except Exception as e:
-        logger_core.error(f"Task {task_id_for_log}: Unexpected error sending notification: {e}", exc_info=True)
-
+# --- Notification Helper (Old one removed) ---
 
 class Trading:
     """
@@ -74,16 +53,11 @@ class Trading:
         self.stop_event = stop_event
         self.results_queue = results_queue
 
-        # Extract notification URL from AppConfig
-        self.notification_url = str(app_config.notification_service_url) if app_config.notification_service_url else None
+        # self.notification_url = str(app_config.notification_service_url) if app_config.notification_service_url else None # Removed
 
         self.logger = logging.getLogger(f"TradingTask-{self.task_id}") # Instance-specific logger
         self.logger.info(f"Initializing trading task for currency {self.task_params['currency']}")
-        if self.notification_url:
-            self.logger.info(f"Notification service URL configured at: {self.notification_url}")
-        else:
-            self.logger.warning("Notification service URL not configured for this task.")
-
+        # No longer logging notification_url, SlackNotifier handles its own logging.
 
         self.connect = None
         if self.exchange_config.name == 'simulation':
@@ -118,8 +92,11 @@ class Trading:
         self.logger.info(f"Initialization complete for {self.task_params['currency']}.")
 
     def _notify_sync(self, message: str):
-        """Internal helper to send notification using instance's notification_url and task_id."""
-        _send_notification_sync(message, self.notification_url, self.task_id)
+        """Internal helper to send notification using the imported send_slack_notification function."""
+        # Add task_id to the message for context, as send_slack_notification is generic
+        contextual_message = f"Task {self.task_id}: {message}"
+        # Assuming send_slack_notification handles logging of success/failure
+        send_slack_notification(message=contextual_message)
 
 
     def run(self):
