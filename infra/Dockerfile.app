@@ -22,12 +22,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements first to leverage Docker layer caching
-COPY setup.py MANIFEST.in ./
+COPY MANIFEST.in ./
+COPY config/pyproject.toml ./pyproject.toml
 # If there was a requirements.txt, it would be: COPY requirements.txt ./
 # RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
-COPY . .
+COPY code/ /app/code/
+COPY config/ /app/config/
 
 # Install dependencies from setup.py
 # Using --no-cache-dir to reduce layer size

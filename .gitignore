@@ -108,3 +108,5 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+crypto_trading_dev.db

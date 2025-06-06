@@ -10,8 +10,8 @@ This project provides a framework for implementing and running various trading a
 
 ## Setup
 1. Clone the repository.
-2. Install dependencies: `pip install .` (This command uses the `pyproject.toml` file to build and install the package).
-3. Configure your trading parameters and API keys in the relevant configuration files.
+2. Install dependencies: `pip install -e .[test]` (This command uses `config/pyproject.toml` to build and install the package in editable mode with test dependencies. Run from the project root).
+3. Configure your trading parameters and API keys in the relevant configuration files located in the `config/` directory.
 
 ## Exchange Configuration
 
@@ -134,11 +134,15 @@ class PlaceholderNet(nn.Module):
 ```
 
 ## Running the Bot
-Execute the main script to start the trading bot:
+After installation, execute the trading bot using the configured entrypoint:
 ```bash
-python main.py
+trading -c config/your_trading_config.json
 ```
-(Assuming `main.py` is the entry point).
+Replace `config/your_trading_config.json` with your desired configuration file (e.g., `config/trading_SIMU.json`).
+Alternatively, to run directly using Python (e.g., for development):
+```bash
+python code/crypto_trading/main.py -c config/your_trading_config.json
+```
 
 ## Slack Integration
 
@@ -201,13 +205,17 @@ Once configured and the bot is running, it will listen for commands in two ways:
 ## Database Migrations (Alembic)
 Alembic is used to manage database schema migrations for the application. It allows for versioning of the database schema as the application evolves.
 
-**Placement:**
-The `alembic/` directory and `alembic.ini` configuration file are located at the project root. This is a standard and recommended practice for Alembic. It allows Alembic to:
-- Be invoked easily from the command line at the project's top level.
-- Manage migrations for the entire application.
-- Correctly import application modules (like database models from `crypto_trading.database.models`) by having the project root in its Python path (configured via `prepend_sys_path = .` in `alembic.ini`).
+**Configuration and Placement:**
+- The Alembic migration scripts are located in `code/alembic/`.
+- The Alembic configuration file is `config/alembic.ini`.
 
-Placing Alembic within the `crypto_trading` package itself would be less conventional and could complicate its usage and the import paths.
+**Running Alembic Commands:**
+To run Alembic commands, you'll typically need to specify the path to the configuration file. From the project root:
+```bash
+alembic -c config/alembic.ini revision -m "create_new_table"
+alembic -c config/alembic.ini upgrade head
+```
+The `config/alembic.ini` file is configured with `script_location = ../code/alembic` (relative to `config/alembic.ini` itself) and `prepend_sys_path = ..` (to add the project root to the Python path), which helps Alembic locate the migration scripts and your application's database models correctly.
 
 ## Disclaimer
 Trading cryptocurrencies involves significant risk. This software is provided "as is", without warranty of any kind. Use at your own risk.

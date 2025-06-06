@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "crypto_trading"
 version = "0.0.1"
 description = "Crypto Trading project."
-readme = "README.md"
+readme = "../README.md"
 authors = [
     { name = "Sebastien Creoff", email = "sebastien.creoff@gmail.com" },
 ]
@@ -32,7 +32,8 @@ dependencies = [
 Homepage = "https://github.com/Sebastiencreoff/pythonTrading"
 
 [tool.setuptools]
-packages = ["crypto_trading"]
+package_dir = {"" = "../code"}
+packages = ["crypto_trading", "config_management", "notification_service", "trading_service"]
 
 [project.scripts]
 trading = "crypto_trading.main:main"
@@ -40,4 +41,5 @@ trading = "crypto_trading.main:main"
 [project.optional-dependencies]
 test = [
     "nose",
+    "pytest",
 ]

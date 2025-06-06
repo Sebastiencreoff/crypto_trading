@@ -10,13 +10,13 @@ WORKDIR /app
 
 # Copy the requirements file and install dependencies
 # Assumes requirements.txt is in the project root, so context is project root.
-COPY ../requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy necessary application code and configuration files
-COPY ./notification_service /app/notification_service
-COPY ./config_management /app/config_management
-COPY ./config/central_config.json /app/config/central_config.json
+COPY code/notification_service /app/notification_service
+COPY code/config_management /app/config_management
+COPY config/central_config.json /app/config/central_config.json
 
 # Expose the port the app runs on
 EXPOSE 8001

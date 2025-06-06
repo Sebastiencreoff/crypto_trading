@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
 # Copy the requirements file and install dependencies
-COPY ../requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy necessary application code and configuration files
@@ -17,12 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Option 1: Copy individual directories from project root context
 # This requires the Docker build context to be the project root.
-COPY ./trading_service /app/trading_service
-COPY ./config_management /app/config_management
-COPY ./crypto_trading/database /app/crypto_trading/database
-COPY ./config/central_config.json /app/config/central_config.json
-COPY ./alembic /app/alembic
-COPY ./alembic.ini /app/alembic.ini
+COPY code/trading_service /app/trading_service
+COPY code/config_management /app/config_management
+COPY code/crypto_trading/database /app/crypto_trading/database
+COPY config/central_config.json /app/config/central_config.json
+COPY code/alembic /app/alembic
+COPY config/alembic.ini /app/config/alembic.ini
 
 # If the Docker build context is set to the `trading_service` directory itself,
 # then paths would need to be relative like `../config_management`.
