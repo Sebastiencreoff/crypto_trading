@@ -16,6 +16,37 @@ This project provides a framework for implementing and running various trading a
     - Ensure you have a running PostgreSQL instance.
     - Create a database and a user with appropriate permissions for the application.
     - Configure the database connection details (host, port, username, password, database name) in `config/central_config.json`.
+
+## Kubernetes PostgreSQL Deployment
+
+For deployments within a Kubernetes cluster, PostgreSQL can be deployed directly as a service within the cluster. The necessary Kubernetes manifests are located in the `infra/kubernetes/` directory:
+
+*   `postgres-secret.yaml`: Manages database credentials (username, password) and the default database name. **Note:** The default password in the manifest is for development purposes and should be changed for production environments.
+*   `postgres-service.yaml`: Defines the internal Kubernetes service (`postgres-svc`) for accessing the database.
+*   `postgres-statefulset.yaml`: Manages the PostgreSQL pod, ensuring persistent storage via `PersistentVolumeClaim`s.
+
+The main application (e.g., `trading-service`) is configured to connect to this internal PostgreSQL instance via environment variables that override settings from `config/central_config.json`. These environment variables are injected into the application's deployment manifest (e.g., `infra/kubernetes/trading_service_deployment.yaml`) and include:
+
+*   `APP_DB_HOST`: Set to `postgres-svc`.
+*   `APP_DB_PORT`: Set to `5432`.
+*   `APP_DB_NAME`: Sourced from `postgres-secret`.
+*   `APP_DB_USER`: Sourced from `postgres-secret`.
+*   `APP_DB_PASSWORD`: Sourced from `postgres-secret`.
+*   `APP_DB_TYPE`: Set to `postgresql`.
+
+The `code/config_management/schemas.py` file has been updated to ensure the `DatabaseConfig` model can be populated from these environment variables.
+
+**Accessing the Database (for Debugging):**
+
+To access the PostgreSQL database directly for debugging or administrative tasks from your local machine, you can use `kubectl port-forward`. For example:
+
+```bash
+# Forward local port 5433 to the PostgreSQL service port 5432
+kubectl port-forward service/postgres-svc 5433:5432
+```
+
+You can then connect to `localhost:5433` using any PostgreSQL client (e.g., `psql`, pgAdmin) with the credentials defined in `postgres-secret` (or your production credentials if changed).
+
 4. Configure your trading parameters and API keys in the relevant configuration files located in the `config/` directory.
 
 ## Exchange Configuration
