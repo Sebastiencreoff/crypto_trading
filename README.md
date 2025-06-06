@@ -11,7 +11,12 @@ This project provides a framework for implementing and running various trading a
 ## Setup
 1. Clone the repository.
 2. Install dependencies: `pip install -e .[test]` (This command uses `config/pyproject.toml` to build and install the package in editable mode with test dependencies. Run from the project root).
-3. Configure your trading parameters and API keys in the relevant configuration files located in the `config/` directory.
+3. **Database Setup (PostgreSQL):**
+    - This application uses PostgreSQL as its database backend.
+    - Ensure you have a running PostgreSQL instance.
+    - Create a database and a user with appropriate permissions for the application.
+    - Configure the database connection details (host, port, username, password, database name) in `config/central_config.json`.
+4. Configure your trading parameters and API keys in the relevant configuration files located in the `config/` directory.
 
 ## Exchange Configuration
 
@@ -203,16 +208,20 @@ Once configured and the bot is running, it will listen for commands in two ways:
     *   Confirm the bot has the correct OAuth scopes/permissions in the Slack App settings.
 
 ## Database Migrations (Alembic)
-Alembic is used to manage database schema migrations for the application. It allows for versioning of the database schema as the application evolves.
+Alembic is used to manage database schema migrations for the application, supporting the PostgreSQL database. It allows for versioning of the database schema as the application evolves.
 
 **Configuration and Placement:**
 - The Alembic migration scripts are located in `code/alembic/`.
-- The Alembic configuration file is `config/alembic.ini`.
+- The Alembic configuration file is `config/alembic.ini`. This file, along with `code/alembic/env.py`, is configured to read database connection details from `config/central_config.json`.
 
 **Running Alembic Commands:**
+Before running migrations, ensure your `config/central_config.json` is correctly set up for your PostgreSQL instance.
 To run Alembic commands, you'll typically need to specify the path to the configuration file. From the project root:
 ```bash
+# Example: Create a new migration
 alembic -c config/alembic.ini revision -m "create_new_table"
+
+# Example: Apply all pending migrations to the database
 alembic -c config/alembic.ini upgrade head
 ```
 The `config/alembic.ini` file is configured with `script_location = ../code/alembic` (relative to `config/alembic.ini` itself) and `prepend_sys_path = ..` (to add the project root to the Python path), which helps Alembic locate the migration scripts and your application's database models correctly.
