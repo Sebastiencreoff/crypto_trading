@@ -11,7 +11,7 @@ authors = [
     { name = "Sebastien Creoff", email = "sebastien.creoff@gmail.com" },
 ]
 license = "MIT"
-requires-python = ">=3.7" # Assuming a reasonable modern Python version, can be adjusted
+requires-python = ">=3.12" # Assuming a reasonable modern Python version, can be adjusted
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
