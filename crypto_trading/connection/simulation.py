@@ -13,7 +13,7 @@ class EndOfProcess(Exception):
 
 
 class SimulationConnect(connection.Connect):
-    """CoinBase API connection."""
+    """Simulated API connection for trading."""
     
     def __init__(self, config_dict, dir_path=None):
         """Initialisation of all configuration needed.

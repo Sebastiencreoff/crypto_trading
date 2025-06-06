@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crypto_trading"
 version = "0.0.1"
-description = "Crypto Trading project with CoinBase API"
+description = "Crypto Trading project."
 readme = "README.md"
 authors = [
     { name = "Sebastien Creoff", email = "sebastien.creoff@gmail.com" },
@@ -18,7 +18,6 @@ classifiers = [
 ]
 dependencies = [
     "setuptools",
-    "coinbase",
     "numpy",
     "pandas",
     "requests",

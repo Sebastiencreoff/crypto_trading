@@ -25,7 +25,7 @@ class Connect(object):
                 currency, self.allow_currencies))
 
     def get_value(self, currency=None):
-        """Get currencies from coinBase in refCurrency.
+        """Get the current value of a currency.
 
             :param ref_currency: reference value
             :return : value of the currency
