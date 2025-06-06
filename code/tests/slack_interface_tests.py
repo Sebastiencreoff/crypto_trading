@@ -1,578 +1,335 @@
 import unittest
-from unittest.mock import patch, Mock, MagicMock
-import datetime # For graph test data
-import os # For os.path.exists and os.remove mocks
+from unittest.mock import patch, Mock, MagicMock, call
+import datetime
+import tempfile
+import os # For os.path.exists and os.remove
 
-# Assuming crypto_trading is in PYTHONPATH
-from crypto_trading.slack_interface import SlackInterface
-from slack_sdk.errors import SlackApiError # For testing upload failure
-# We will mock Config and Trading rather than importing them directly for most tests
-# from crypto_trading.config import Config # Not strictly needed if fully mocked
-# from crypto_trading.trading import Trading # Not strictly needed if fully mocked
+# Assuming 'code' is project root in PYTHONPATH, or sys.path is adjusted
+from crypto_trading.slack.slack_interface import SlackCommandHandler
+from crypto_trading.task_manager import TaskManager # Mocked, but import for type hinting if desired
+from config_management.schemas import SlackConfig # For creating mock config
+from slack_sdk.errors import SlackApiError
 
-# Placeholder for where slack_sdk might be if we needed to mock deeper
-# import slack_sdk
+# Paths for patching plotting and tempfile where they are used in slack_interface.py
+SLACK_INTERFACE_MODULE_PATH = "crypto_trading.slack.slack_interface"
 
-class TestSlackInterface(unittest.TestCase):
+class TestSlackCommandHandler(unittest.TestCase):
 
     def setUp(self):
-        # Mock configuration
-        self.mock_conf = Mock()
-        self.mock_conf.slack_token = "xoxb-test-token"
-        self.mock_conf.slack_channel_id = "C123TEST"
-        self.mock_conf.initial_capital = 1000.0 # Added for graph command
-        # In config.py, these are loaded via self.config_dict.get('slack_token'),
-        # so they become attributes of the conf object.
-
-        # Mock trading instance
-        self.mock_trading_instance = Mock()
-        self.mock_trading_instance.is_running = Mock(return_value=False)
-        self.mock_trading_instance.profits = Mock(return_value=0.0)
-        self.mock_trading_instance.stop = Mock()
-        # self.mock_trading_instance.run = Mock() # For 'start' command testing if needed
-
-        # Mock WebClient and RTMClient at the module level where SlackInterface imports them
-        # These will be class-level patches usually, or context managers in tests.
-        # For now, we'll prepare for their use.
-
-
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_initialization_success(self, MockWebClient, MockRTMClient):
-        # Setup mock return values for WebClient
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'user_id': 'U123', 'bot_id': 'B456'}
-
-        # Setup mock return values for RTMClient
-        # mock_rtm_client_instance = MockRTMClient.return_value # If RTMClient methods were called in __init__
-
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        MockWebClient.assert_called_once_with(token="xoxb-test-token")
-        mock_web_client_instance.auth_test.assert_called_once()
-        MockRTMClient.assert_called_once_with(token="xoxb-test-token")
-
-        self.assertIsNotNone(slack_interface.client, "Client should be initialized on success")
-        self.assertIsNotNone(slack_interface.rtm_client, "RTMClient should be initialized on success")
-        self.assertEqual(slack_interface.bot_id, "B456")
-
-
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_initialization_no_token(self, MockWebClient, MockRTMClient):
-        self.mock_conf.slack_token = None
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        MockWebClient.assert_not_called()
-        MockRTMClient.assert_not_called()
-        self.assertIsNone(slack_interface.client, "Client should be None if token is missing")
-        self.assertIsNone(slack_interface.rtm_client, "RTMClient should be None if token is missing")
-
-
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_initialization_auth_failure(self, MockWebClient, MockRTMClient):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': False, 'error': 'auth_failed'}
-
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        MockWebClient.assert_called_once_with(token="xoxb-test-token")
-        mock_web_client_instance.auth_test.assert_called_once()
-        # RTMClient IS called before auth_test, but slack_interface.rtm_client is set to None if auth fails
-        MockRTMClient.assert_called_once_with(token="xoxb-test-token")
-
-        self.assertIsNone(slack_interface.client, "Client should be None on auth failure")
-        # In the current implementation, RTMClient is initialized before auth_test.
-        # It might be better to set both to None if auth_test fails.
-        # The current code sets both client and rtm_client to None if auth_test fails or an exception occurs.
-        self.assertIsNone(slack_interface.rtm_client, "RTMClient should be None on auth failure")
-
-
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_send_message_success(self, MockWebClient, MockRTMClient):
-        # Ensure interface is initialized successfully for this test
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'user_id': 'U123', 'bot_id': 'B456'}
-
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        self.assertIsNotNone(slack_interface.client) # Pre-condition
-
-        slack_interface.send_message("test message")
-        mock_web_client_instance.chat_postMessage.assert_called_once_with(
-            channel=self.mock_conf.slack_channel_id, text="test message"
+        # 1. Mock Configuration (SlackConfig)
+        self.mock_slack_config = SlackConfig(
+            bot_token="xoxb-test-token",
+            default_channel_id="C123TEST",
+            admin_user_ids=["UADMIN1"], # Example, not directly used by current SCH commands
+            task_docker_image="test-task-image:latest" # Example
         )
 
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_send_message_client_disabled(self, MockWebClient, MockRTMClient):
-        self.mock_conf.slack_token = None # Disable client
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        self.assertIsNone(slack_interface.client) # Pre-condition
+        # 2. Mock TaskManager
+        self.mock_task_manager = Mock(spec=TaskManager)
+        self.mock_task_manager.create_task = Mock(return_value="task_uuid_123")
+        self.mock_task_manager.stop_task = Mock(return_value=True)
+        self.mock_task_manager.get_task_status = Mock(return_value="running")
+        self.mock_task_manager.list_tasks = Mock(return_value={"task_1": "running", "task_2": "completed"})
+        self.mock_task_manager.get_task_results = Mock(return_value="Sample task logs or results.")
 
-        # Get the underlying mock for the WebClient instance to check calls
-        # Since client is None, no instance is stored on slack_interface.client
-        # We need to check the original MockWebClient's return_value if it was ever created.
-        # In this case (no token), MockWebClient() is not called.
+        # 3. Patch slack_sdk clients used by SlackCommandHandler
+        # These patches will apply to all tests in this class.
+        # We get the mock instances in each test or here if setup is complex.
+        self.web_client_patcher = patch(f'{SLACK_INTERFACE_MODULE_PATH}.WebClient')
+        self.rtm_client_patcher = patch(f'{SLACK_INTERFACE_MODULE_PATH}.RTMClient')
 
-        slack_interface.send_message("test message")
-        MockWebClient.return_value.chat_postMessage.assert_not_called()
+        self.MockWebClient = self.web_client_patcher.start()
+        self.MockRTMClient = self.rtm_client_patcher.start()
+
+        # Configure the mock WebClient instance that will be returned
+        self.mock_web_client_instance = self.MockWebClient.return_value
+        self.mock_web_client_instance.auth_test.return_value = {'ok': True, 'user': 'test_bot_user'}
+        self.mock_web_client_instance.chat_postMessage = Mock(return_value={'ok': True, 'message': {'ts': '123.456'}})
+        self.mock_web_client_instance.files_upload_v2 = Mock(return_value={'ok': True, 'files': []})
+
+        # Configure the mock RTMClient instance
+        self.mock_rtm_client_instance = self.MockRTMClient.return_value
+        # RTMClient.start() is blocking, so we don't mock its direct output here unless testing start_listening loop.
+        # For command tests, we call handler.handle_command directly.
+
+        # 4. Initialize SlackCommandHandler
+        # The 'conf' passed to SlackCommandHandler is our mock_slack_config
+        self.handler = SlackCommandHandler(conf=self.mock_slack_config, task_manager=self.mock_task_manager)
+
+        # For convenience, mock _send_message to prevent actual Slack calls during most command tests
+        # We can then assert its calls.
+        # self.handler._send_message = Mock()
+        # Replaced by asserting self.mock_web_client_instance.chat_postMessage calls
+
+    def tearDown(self):
+        self.web_client_patcher.stop()
+        self.rtm_client_patcher.stop()
+
+    # --- Initialization Tests ---
+    def test_initialization_success(self):
+        self.MockWebClient.assert_called_once_with(token="xoxb-test-token")
+        self.mock_web_client_instance.auth_test.assert_called_once()
+        self.MockRTMClient.assert_called_once_with(token="xoxb-test-token")
+        self.assertTrue(self.handler.is_initialized())
+        self.assertEqual(self.handler.task_docker_image, "test-task-image:latest")
 
 
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message') # Mock send_message
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_start_running(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
+    @patch.dict(os.environ, {"SLACK_BOT_TOKEN": "env-token"}, clear=True)
+    def test_initialization_success_from_env_token(self):
+        # Test if token from env is used when not in config
+        mock_conf_no_token = SlackConfig(bot_token=None, default_channel_id="C123")
 
-        self.mock_trading_instance.is_running.return_value = True # Bot is already running
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
+        # Re-patch WebClient for this specific scenario if its instance is modified in setUp
+        # For this test, we create a new handler
+        mock_web_client_inst = self.MockWebClient.return_value # Use the already patched one from setUp
+        mock_web_client_inst.auth_test.return_value = {'ok': True, 'user': 'test_bot_user_env'}
 
-        slack_interface.handle_command("start", "user1", "channel1")
-        # self.mock_trading_instance.run.assert_not_called() # or assert_called_once if it's idempotent
-        mock_send_message_method.assert_called_once_with("Trading bot is already running.")
+        handler_env = SlackCommandHandler(conf=mock_conf_no_token, task_manager=self.mock_task_manager)
 
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_start_stopped_cannot_restart(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
+        self.MockWebClient.assert_called_with(token="env-token") # Check last call or specific call
+        mock_web_client_inst.auth_test.assert_called() # Check last call
+        self.MockRTMClient.assert_called_with(token="env-token")
+        self.assertTrue(handler_env.is_initialized())
 
-        self.mock_trading_instance.is_running.return_value = False # Bot is stopped
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
 
-        slack_interface.handle_command("start", "user1", "channel1")
-        # self.mock_trading_instance.run.assert_not_called() # Current design limitation
-        mock_send_message_method.assert_called_once_with(
-            "Trading bot is currently stopped. A 'start' command from Slack cannot restart a fully exited trading loop without a redesign. Please restart the application if needed."
+    def test_initialization_no_token_anywhere(self):
+        # Ensure env doesn't have the token for this test
+        with patch.dict(os.environ, {}, clear=True):
+            mock_conf_no_token = SlackConfig(bot_token=None, default_channel_id="C123")
+            # Reset call counts for global mocks if they are re-used across handlers
+            self.MockWebClient.reset_mock()
+            self.MockRTMClient.reset_mock()
+
+            handler_no_token = SlackCommandHandler(conf=mock_conf_no_token, task_manager=self.mock_task_manager)
+
+            self.MockWebClient.assert_not_called() # Because token discovery fails early
+            self.MockRTMClient.assert_not_called()
+            self.assertFalse(handler_no_token.is_initialized())
+
+    def test_initialization_auth_failure(self):
+        self.mock_web_client_instance.auth_test.return_value = {'ok': False, 'error': 'auth_failed'}
+        # Re-initialize handler to pick up the changed auth_test mock
+        handler_auth_fail = SlackCommandHandler(conf=self.mock_slack_config, task_manager=self.mock_task_manager)
+
+        self.MockWebClient.assert_called_with(token="xoxb-test-token")
+        self.mock_web_client_instance.auth_test.assert_called()
+        self.MockRTMClient.assert_not_called() # RTMClient init is skipped if WebClient auth fails
+        self.assertFalse(handler_auth_fail.is_initialized())
+
+    # --- Command Tests ---
+    # We will call self.handler.handle_command(command_string, user, channel)
+    # And assert calls to self.mock_web_client_instance.chat_postMessage for text responses
+    # or self.mock_web_client_instance.files_upload_v2 for file uploads.
+
+    def test_handle_command_help(self):
+        self.handler.handle_command("help", "UUSER1", "CCHANNEL1")
+        expected_help_text = self.handler._handle_help_command() # Get the exact text
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text=expected_help_text
         )
 
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_stop(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        slack_interface.handle_command("stop", "user1", "channel1")
-        self.mock_trading_instance.stop.assert_called_once()
-        mock_send_message_method.assert_called_once_with("Trading bot stop signal sent.")
-
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_status_running(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        self.mock_trading_instance.is_running.return_value = True
-        self.mock_trading_instance.profits.return_value = 123.45
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        slack_interface.handle_command("status", "user1", "channel1")
-        mock_send_message_method.assert_called_once_with("Bot status: Running. Current profits: 123.45")
-
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_status_stopped(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        self.mock_trading_instance.is_running.return_value = False
-        self.mock_trading_instance.profits.return_value = 0.0
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        slack_interface.handle_command("status", "user1", "channel1")
-        mock_send_message_method.assert_called_once_with("Bot status: Stopped. Current profits: 0.0")
-
-    @patch('crypto_trading.slack_interface.SlackInterface.send_message')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_handle_command_unknown(self, MockWebClient, MockRTMClient, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        # This instance of slack_interface will be used for most command tests
-        # It's important that it's initialized correctly for client to be not None
-        self.slack_interface_for_commands = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        self.assertIsNotNone(self.slack_interface_for_commands.client) # Ensure client is active for these tests
-
-        self.slack_interface_for_commands.handle_command("unknown_command", "user1", "channel1")
-        mock_send_message_method.assert_called_once_with(
-            "Unknown command: 'unknown_command'. Try 'start', 'stop', 'status', 'graph', or 'pnl_chart'."
+    def test_handle_command_start(self):
+        self.handler.handle_command("start", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.create_task.assert_called_once_with(self.handler.default_task_config)
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Trading task started successfully. Task ID: `task_uuid_123`"
         )
 
+    def test_handle_command_start_failure(self):
+        self.mock_task_manager.create_task.return_value = None # Simulate failure
+        self.handler.handle_command("start", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.create_task.assert_called_once_with(self.handler.default_task_config)
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: Failed to start trading task. Check logs for details."
+        )
 
-    # --- Tests for 'graph' command ---
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_portfolio_graph')
-    @patch('crypto_trading.slack_interface.model.get_portfolio_value_history')
-    @patch('crypto_trading.slack_interface.WebClient') # To get the client instance for files_upload_v2
-    @patch('crypto_trading.slack_interface.RTMClient') # Standard patch
-    def test_handle_command_graph_success(self, MockRTMClient, MockWebClient, mock_get_history,
-                                          mock_generate_graph, mock_NamedTemporaryFile, mock_os_remove):
-        # Setup WebClient mock instance for this test
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
+    def test_handle_command_stop_success(self):
+        self.handler.handle_command("stop task_abc", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.stop_task.assert_called_once_with("task_abc")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Stop signal sent for task `task_abc`. It may take a moment to terminate."
+        )
 
-        # Initialize SlackInterface here to use the method-scoped MockWebClient
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        self.assertIsNotNone(slack_interface.client) # Ensure client is active
+    def test_handle_command_stop_failure(self):
+        self.mock_task_manager.stop_task.return_value = False # Simulate failure
+        self.handler.handle_command("stop task_abc", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.stop_task.assert_called_once_with("task_abc")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: Failed to stop task `task_abc`. It might have already completed or does not exist. Check logs."
+        )
 
-        sample_data_points = [(datetime.datetime.now(), 1000.0), (datetime.datetime.now(), 1050.0)]
-        mock_get_history.return_value = sample_data_points
+    def test_handle_command_stop_no_task_id(self):
+        self.handler.handle_command("stop", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.stop_task.assert_not_called()
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: `task_id` is required for the stop command. Usage: `!crypto stop <task_id>`"
+        )
 
-        mock_graph_file_path = "dummy_temp_graph.png"
-        mock_generate_graph.return_value = mock_graph_file_path
+    def test_handle_command_status_specific_task(self):
+        self.mock_task_manager.get_task_status.return_value = "completed"
+        self.handler.handle_command("status task_xyz", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.get_task_status.assert_called_once_with("task_xyz")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Status for task `task_xyz`: completed"
+        )
 
-        # Mock tempfile.NamedTemporaryFile
+    def test_handle_command_status_specific_task_not_found(self):
+        self.mock_task_manager.get_task_status.return_value = None
+        self.handler.handle_command("status task_nonexistent", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.get_task_status.assert_called_once_with("task_nonexistent")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: Could not retrieve status for task `task_nonexistent`. It may not exist or an error occurred."
+        )
+
+    def test_handle_command_status_list_all(self):
+        self.mock_task_manager.list_tasks.return_value = {"task_1": "running", "task_2": "stopped"}
+        self.handler.handle_command("status", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.list_tasks.assert_called_once()
+        expected_message = "Current tasks and their statuses:\n- Task `task_1`: running\n- Task `task_2`: stopped"
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text=expected_message
+        )
+
+    def test_handle_command_status_list_all_no_tasks(self):
+        self.mock_task_manager.list_tasks.return_value = {}
+        self.handler.handle_command("status", "UUSER1", "CCHANNEL1")
+        self.mock_task_manager.list_tasks.assert_called_once()
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="No active tasks found."
+        )
+
+    def test_handle_command_unknown(self):
+        self.handler.handle_command("foobar", "UUSER1", "CCHANNEL1")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Unknown command: 'foobar'. Type `!crypto help` for available commands."
+        )
+
+    # --- Graph and PnL Chart Command Tests ---
+    # These require more patching due to file operations and plotting library calls.
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.remove')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.path.exists')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.tempfile.NamedTemporaryFile')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.generate_portfolio_graph')
+    def test_handle_command_graph_success(self, mock_generate_graph, mock_NamedTemporaryFile,
+                                          mock_os_exists, mock_os_remove):
+        # Mock file operations
         mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock() # Context Manager
+        mock_temp_file_obj.name = "dummy_temp_graph.png"
+        mock_named_temp_file_cm = MagicMock() # Use MagicMock for context manager __enter__/__exit__
         mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_named_temp_file_cm.__exit__.return_value = None
         mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
 
-        # Mock os.path.exists for the finally block
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("graph", "user1", "channel1")
+        mock_os_exists.return_value = True # Simulate file exists for cleanup
+        mock_generate_graph.return_value = "dummy_temp_graph.png" # Simulate graph generated
 
-        mock_get_history.assert_called_once_with(self.mock_conf.initial_capital)
+        # Simulate task results and portfolio history fetching (using internal _fetch method)
+        # We can also mock self.handler._fetch_portfolio_history if we want to control its output directly
+        with patch.object(self.handler, '_fetch_portfolio_history', return_value=[(datetime.datetime.now(), 1000.0)]):
+            self.handler.handle_command("graph task_g1", "UUSER1", "CCHANNEL1")
+
+        self.mock_task_manager.get_task_results.assert_called_once_with("task_g1")
         mock_NamedTemporaryFile.assert_called_once_with(suffix=".png", delete=False)
-        mock_generate_graph.assert_called_once_with(sample_data_points, mock_graph_file_path)
-
-        # Use the client instance from the initialized slack_interface
-        slack_interface.client.files_upload_v2.assert_called_once_with(
-            channel="channel1",
-            file=mock_graph_file_path,
-            title="Portfolio Value Over Time",
-            initial_comment="Here is the portfolio value graph:"
+        mock_generate_graph.assert_called_once() # Args checked if specific data is passed
+        self.mock_web_client_instance.files_upload_v2.assert_called_once_with(
+            channel="CCHANNEL1",
+            filepath="dummy_temp_graph.png",
+            title="Portfolio Value Over Time - Task task_g1",
+            initial_comment="Portfolio graph for task `task_g1`:"
         )
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
+        mock_os_exists.assert_called_once_with("dummy_temp_graph.png")
+        mock_os_remove.assert_called_once_with("dummy_temp_graph.png")
+        self.mock_web_client_instance.chat_postMessage.assert_not_called() # Upload is the message
 
 
-    @patch.object(SlackInterface, 'send_message')
-    @patch('crypto_trading.slack_interface.generate_portfolio_graph') # To ensure it's not called
-    @patch('crypto_trading.slack_interface.model.get_portfolio_value_history')
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_graph_insufficient_data(self, MockRTMClient, MockWebClient, mock_get_history,
-                                                    mock_generate_graph, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        mock_get_history.return_value = [(datetime.datetime.now(), 1000.0)] # Only one point
-
-        slack_interface.handle_command("graph", "user1", "channel1")
-
-        mock_get_history.assert_called_once_with(self.mock_conf.initial_capital)
-        mock_send_message_method.assert_called_once_with("Not enough data to generate a graph yet.")
-        mock_generate_graph.assert_not_called()
-        slack_interface.client.files_upload_v2.assert_not_called()
-
-
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_portfolio_graph', return_value=None) # Mock graph generation failure
-    @patch('crypto_trading.slack_interface.model.get_portfolio_value_history')
-    @patch.object(SlackInterface, 'send_message') # Mocking send_message directly on the class
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_graph_generation_fails(self, MockRTMClient, MockWebClient, mock_send_message_method,
-                                                 mock_get_history, mock_generate_graph_fails,
-                                                 mock_NamedTemporaryFile, mock_os_remove):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        sample_data_points = [(datetime.datetime.now(), 1000.0), (datetime.datetime.now(), 1050.0)]
-        mock_get_history.return_value = sample_data_points
-
-        mock_graph_file_path = "dummy_temp_graph.png"
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.remove')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.path.exists')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.tempfile.NamedTemporaryFile')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.generate_pnl_per_trade_graph')
+    def test_handle_command_pnl_chart_success(self, mock_generate_pnl_chart, mock_NamedTemporaryFile,
+                                              mock_os_exists, mock_os_remove):
         mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock()
+        mock_temp_file_obj.name = "dummy_temp_pnl.png"
+        mock_named_temp_file_cm = MagicMock()
         mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_named_temp_file_cm.__exit__.return_value = None
         mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
 
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("graph", "user1", "channel1")
+        mock_os_exists.return_value = True
+        mock_generate_pnl_chart.return_value = "dummy_temp_pnl.png"
 
-        mock_get_history.assert_called_once_with(self.mock_conf.initial_capital)
-        mock_generate_graph_fails.assert_called_once()
-        mock_send_message_method.assert_called_once_with(
-            "Sorry, I couldn't generate the portfolio graph at this time (generation failed)."
+        with patch.object(self.handler, '_fetch_trade_history', return_value=[{'label': 'T1', 'profit': 100}]):
+            self.handler.handle_command("pnl_chart task_p1", "UUSER1", "CCHANNEL1")
+
+        self.mock_task_manager.get_task_results.assert_called_once_with("task_p1")
+        mock_NamedTemporaryFile.assert_called_once_with(suffix=".png", delete=False)
+        mock_generate_pnl_chart.assert_called_once()
+        self.mock_web_client_instance.files_upload_v2.assert_called_once_with(
+            channel="CCHANNEL1",
+            filepath="dummy_temp_pnl.png",
+            title="P/L Per Trade - Task task_p1",
+            initial_comment="P/L per trade chart for task `task_p1`:"
         )
-        slack_interface.client.files_upload_v2.assert_not_called()
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
+        mock_os_exists.assert_called_once_with("dummy_temp_pnl.png")
+        mock_os_remove.assert_called_once_with("dummy_temp_pnl.png")
+        self.mock_web_client_instance.chat_postMessage.assert_not_called()
 
-
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_portfolio_graph')
-    @patch('crypto_trading.slack_interface.model.get_portfolio_value_history')
-    @patch.object(SlackInterface, 'send_message')
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_graph_slack_upload_fails(self, MockRTMClient, MockWebClient, mock_send_message_method,
-                                                    mock_get_history, mock_generate_graph,
-                                                    mock_NamedTemporaryFile, mock_os_remove):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-
-        # This specific instance of WebClient's method needs to raise an error
-        mock_web_client_instance.files_upload_v2.side_effect = SlackApiError(
-            message="Upload failed", response={"error": "upload_error", "ok": False}
+    def test_handle_command_graph_no_task_id(self):
+        self.handler.handle_command("graph", "UUSER1", "CCHANNEL1")
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: `task_id` is required. Usage: `!crypto graph <task_id>`"
         )
+        self.mock_web_client_instance.files_upload_v2.assert_not_called()
 
-        # Re-initialize slack_interface AFTER setting up the WebClient mock's side_effect for files_upload_v2
-        # if WebClient is patched at method level.
-        # If WebClient is patched at class level, this should be fine.
-        # For safety, we can ensure slack_interface.client is this mocked instance.
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        slack_interface.client = mock_web_client_instance # Ensure it uses the specifically mocked client
-
-        sample_data_points = [(datetime.datetime.now(), 1000.0), (datetime.datetime.now(), 1050.0)]
-        mock_get_history.return_value = sample_data_points
-
-        mock_graph_file_path = "dummy_temp_graph.png"
-        mock_generate_graph.return_value = mock_graph_file_path
-
+    # Example test for graph generation failure
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.tempfile.NamedTemporaryFile')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.generate_portfolio_graph', return_value=None) # Simulate gen failure
+    def test_handle_command_graph_generation_failure(self, mock_generate_graph, mock_NamedTemporaryFile):
         mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock()
+        mock_temp_file_obj.name = "dummy_temp_graph.png"
+        mock_named_temp_file_cm = MagicMock()
         mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_named_temp_file_cm.__exit__.return_value = None
         mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
 
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("graph", "user1", "channel1")
+        # Mock os.remove and os.path.exists for the finally block if the file is created then deleted
+        with patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.remove') as mock_os_remove, \
+             patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.path.exists', return_value=True) as mock_os_exists:
 
-        mock_get_history.assert_called_once_with(self.mock_conf.initial_capital)
-        mock_generate_graph.assert_called_once()
-        slack_interface.client.files_upload_v2.assert_called_once() # It was called
-        mock_send_message_method.assert_called_once_with(
-            "Sorry, a Slack error occurred while uploading the graph: upload_error"
+            with patch.object(self.handler, '_fetch_portfolio_history', return_value=[(datetime.datetime.now(), 1000.0)]):
+                 self.handler.handle_command("graph task_g_fail", "UUSER1", "CCHANNEL1")
+
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: Failed to generate portfolio graph for task `task_g_fail`."
         )
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
+        self.mock_web_client_instance.files_upload_v2.assert_not_called()
+        mock_os_remove.assert_called_once() # Temp file should still be cleaned up
 
-    # Test for start_listening is more complex and will be simplified
 
-    @patch('crypto_trading.slack_interface.time') # Mock time.sleep
-    @patch.object(SlackInterface, 'handle_command') # Mock the instance method
-    @patch('crypto_trading.slack_interface.RTMClient')
-    @patch('crypto_trading.slack_interface.WebClient')
-    def test_start_listening_event_processing_and_ignore_own_message(
-            self, MockWebClient, MockRTMClient, mock_handle_command_method, mock_time):
+    # Test for file upload failure
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.remove')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.os.path.exists', return_value=True)
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.tempfile.NamedTemporaryFile')
+    @patch(f'{SLACK_INTERFACE_MODULE_PATH}.generate_portfolio_graph')
+    def test_handle_command_graph_upload_failure(self, mock_generate_graph, mock_NamedTemporaryFile,
+                                                mock_os_exists, mock_os_remove):
+        mock_temp_file_obj = Mock()
+        mock_temp_file_obj.name = "dummy_graph_upload_fail.png"
+        mock_named_temp_file_cm = MagicMock()
+        mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
+        mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
 
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'} # Bot's own ID
+        mock_generate_graph.return_value = "dummy_graph_upload_fail.png"
 
-        mock_rtm_instance = MockRTMClient.return_value
+        # Simulate Slack API error during file upload
+        self.mock_web_client_instance.files_upload_v2.return_value = {'ok': False, 'error': 'upload_failed_test'}
 
-        # Simulate two messages: one from a user, one from the bot itself
-        test_payload_user = {
-            'type': 'message', 'text': 'status', 'user': 'UUSER1',
-            'channel': self.mock_conf.slack_channel_id, 'ts': '12345.678'
-        }
-        test_payload_bot_own_message = {
-            'type': 'message', 'text': 'some response', 'user': 'B456', # Message from bot
-            'channel': self.mock_conf.slack_channel_id, 'ts': '12345.679'
-        }
-        test_payload_other_channel_no_mention = {
-             'type': 'message', 'text': 'status', 'user': 'UUSER2',
-             'channel': 'COTHERCHANNEL', 'ts': '12345.680'
-        }
-        test_payload_other_channel_with_mention = {
-            'type': 'message', 'text': '<@B456> status', 'user': 'UUSER3',
-            'channel': 'COTHERCHANNEL2', 'ts': '12345.681'
-        }
-        # Simulate RTMClient.start() yielding these payloads and then an error to break the loop for the test
-        mock_rtm_instance.start.return_value = [
-            test_payload_user,
-            test_payload_bot_own_message,
-            test_payload_other_channel_no_mention,
-            test_payload_other_channel_with_mention,
-            Exception("Stop loop for test") # To break out of the while True
-        ]
+        with patch.object(self.handler, '_fetch_portfolio_history', return_value=[(datetime.datetime.now(), 1000.0)]):
+            self.handler.handle_command("graph task_g_upload_fail", "UUSER1", "CCHANNEL1")
 
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        # Call start_listening. It will loop until Exception("Stop loop for test")
-        with self.assertRaisesRegex(Exception, "Stop loop for test"):
-            slack_interface.start_listening()
-
-        # Assert handle_command was called for the user's message in target channel
-        mock_handle_command_method.assert_any_call(
-            'status', 'UUSER1', self.mock_conf.slack_channel_id
+        self.mock_web_client_instance.files_upload_v2.assert_called_once()
+        self.mock_web_client_instance.chat_postMessage.assert_called_once_with(
+            channel="CCHANNEL1", text="Error: Failed to upload portfolio graph for task `task_g_upload_fail`."
         )
-        # Assert handle_command was called for the user's message in other channel with mention
-        mock_handle_command_method.assert_any_call(
-            'status', 'UUSER3', 'COTHERCHANNEL2' # text is stripped of mention
-        )
-
-        # Check total calls to handle_command to ensure bot's own message and other_channel_no_mention were ignored
-        self.assertEqual(mock_handle_command_method.call_count, 2)
+        mock_os_remove.assert_called_once_with("dummy_graph_upload_fail.png")
 
 
 if __name__ == '__main__':
     unittest.main()
-
-
-    # --- Tests for 'pnl_chart' command ---
-
-    def create_mock_sqlobject_trade(self, sell_date_time, profit):
-        trade = Mock()
-        trade.sell_date_time = sell_date_time
-        trade.profit = profit
-        return trade
-
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_pnl_per_trade_graph')
-    @patch('crypto_trading.slack_interface.model.Trading.select')
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_pnl_chart_success(self, MockRTMClient, MockWebClient, mock_trading_select,
-                                             mock_generate_pnl_graph, mock_NamedTemporaryFile, mock_os_remove):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        mock_trade1_sell_time = datetime.datetime(2023, 1, 1, 11, 0, 0)
-        mock_trade1 = self.create_mock_sqlobject_trade(mock_trade1_sell_time, 50.0)
-        mock_trade2_sell_time = datetime.datetime(2023, 1, 2, 11, 0, 0)
-        mock_trade2 = self.create_mock_sqlobject_trade(mock_trade2_sell_time, -20.0)
-
-        mock_trading_select.return_value = [mock_trade1, mock_trade2]
-
-        mock_graph_file_path = "dummy_pnl_chart.png"
-        mock_generate_pnl_graph.return_value = mock_graph_file_path
-
-        mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock()
-        mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
-
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("pnl_chart", "user1", "channel1")
-
-        mock_trading_select.assert_called_once() # Basic check, can be more specific on query
-
-        expected_trades_data = [
-            {'label': '2023-01-01 11:00', 'profit': 50.0},
-            {'label': '2023-01-02 11:00', 'profit': -20.0}
-        ]
-        mock_generate_pnl_graph.assert_called_once_with(expected_trades_data, mock_graph_file_path)
-
-        slack_interface.client.files_upload_v2.assert_called_once_with(
-            channel="channel1",
-            file=mock_graph_file_path,
-            title="Profit/Loss per Trade",
-            initial_comment="Here is the P/L chart for completed trades:"
-        )
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
-
-    @patch.object(SlackInterface, 'send_message')
-    @patch('crypto_trading.slack_interface.generate_pnl_per_trade_graph')
-    @patch('crypto_trading.slack_interface.model.Trading.select', return_value=[]) # No trades
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_pnl_chart_no_trades(self, MockRTMClient, MockWebClient, mock_trading_select,
-                                               mock_generate_pnl_graph, mock_send_message_method):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        slack_interface.handle_command("pnl_chart", "user1", "channel1")
-
-        mock_trading_select.assert_called_once()
-        mock_send_message_method.assert_called_once_with("No completed trades found to generate a P/L chart.")
-        mock_generate_pnl_graph.assert_not_called()
-
-
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_pnl_per_trade_graph', return_value=None) # Gen fails
-    @patch('crypto_trading.slack_interface.model.Trading.select')
-    @patch.object(SlackInterface, 'send_message')
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_pnl_chart_generation_fails(self, MockRTMClient, MockWebClient, mock_send_message,
-                                                       mock_trading_select, mock_generate_pnl_graph_fails,
-                                                       mock_NamedTemporaryFile, mock_os_remove):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-
-        mock_trade1 = self.create_mock_sqlobject_trade(datetime.datetime.now(), 50.0)
-        mock_trading_select.return_value = [mock_trade1] # Some data
-
-        mock_graph_file_path = "dummy_pnl_chart.png"
-        mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock()
-        mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
-
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("pnl_chart", "user1", "channel1")
-
-        mock_generate_pnl_graph_fails.assert_called_once()
-        mock_send_message.assert_called_once_with(
-            "Sorry, I couldn't generate the P/L chart at this time (generation failed)."
-        )
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
-
-
-    @patch('crypto_trading.slack_interface.os.remove')
-    @patch('crypto_trading.slack_interface.tempfile.NamedTemporaryFile')
-    @patch('crypto_trading.slack_interface.generate_pnl_per_trade_graph')
-    @patch('crypto_trading.slack_interface.model.Trading.select')
-    @patch.object(SlackInterface, 'send_message')
-    @patch('crypto_trading.slack_interface.WebClient')
-    @patch('crypto_trading.slack_interface.RTMClient')
-    def test_handle_command_pnl_chart_slack_upload_fails(self, MockRTMClient, MockWebClient, mock_send_message,
-                                                        mock_trading_select, mock_generate_pnl_graph,
-                                                        mock_NamedTemporaryFile, mock_os_remove):
-        mock_web_client_instance = MockWebClient.return_value
-        mock_web_client_instance.auth_test.return_value = {'ok': True, 'bot_id': 'B456'}
-        mock_web_client_instance.files_upload_v2.side_effect = SlackApiError(
-            message="PNL Upload failed", response={"error": "pnl_upload_error", "ok": False}
-        )
-        slack_interface = SlackInterface(conf=self.mock_conf, trading_instance=self.mock_trading_instance)
-        slack_interface.client = mock_web_client_instance # Ensure our mock instance is used
-
-        mock_trade1 = self.create_mock_sqlobject_trade(datetime.datetime.now(), 50.0)
-        mock_trading_select.return_value = [mock_trade1]
-
-        mock_graph_file_path = "dummy_pnl_chart.png"
-        mock_generate_pnl_graph.return_value = mock_graph_file_path
-
-        mock_temp_file_obj = Mock()
-        mock_temp_file_obj.name = mock_graph_file_path
-        mock_named_temp_file_cm = Mock()
-        mock_named_temp_file_cm.__enter__.return_value = mock_temp_file_obj
-        mock_NamedTemporaryFile.return_value = mock_named_temp_file_cm
-
-        with patch('crypto_trading.slack_interface.os.path.exists', return_value=True) as mock_os_exists:
-            slack_interface.handle_command("pnl_chart", "user1", "channel1")
-
-        mock_generate_pnl_graph.assert_called_once()
-        slack_interface.client.files_upload_v2.assert_called_once()
-        mock_send_message.assert_called_once_with(
-            "Sorry, a Slack error occurred while uploading the P/L chart: pnl_upload_error"
-        )
-        mock_os_exists.assert_called_once_with(mock_graph_file_path)
-        mock_os_remove.assert_called_once_with(mock_graph_file_path)
