@@ -10,7 +10,7 @@ This project provides a framework for implementing and running various trading a
 
 ## Setup
 1. Clone the repository.
-2. Install dependencies: `pip install -r requirements.txt` (Note: `requirements.txt` may need to be created or updated).
+2. Install dependencies: `pip install .` (This command uses the `pyproject.toml` file to build and install the package).
 3. Configure your trading parameters and API keys in the relevant configuration files.
 
 ## Exchange Configuration
@@ -197,6 +197,17 @@ Once configured and the bot is running, it will listen for commands in two ways:
     *   Ensure the `slack_token` and `slack_channel_id` in your configuration file are correct.
     *   Verify that the bot user has been invited to the channel specified by `slack_channel_id`.
     *   Confirm the bot has the correct OAuth scopes/permissions in the Slack App settings.
+
+## Database Migrations (Alembic)
+Alembic is used to manage database schema migrations for the application. It allows for versioning of the database schema as the application evolves.
+
+**Placement:**
+The `alembic/` directory and `alembic.ini` configuration file are located at the project root. This is a standard and recommended practice for Alembic. It allows Alembic to:
+- Be invoked easily from the command line at the project's top level.
+- Manage migrations for the entire application.
+- Correctly import application modules (like database models from `crypto_trading.database.models`) by having the project root in its Python path (configured via `prepend_sys_path = .` in `alembic.ini`).
+
+Placing Alembic within the `crypto_trading` package itself would be less conventional and could complicate its usage and the import paths.
 
 ## Disclaimer
 Trading cryptocurrencies involves significant risk. This software is provided "as is", without warranty of any kind. Use at your own risk.

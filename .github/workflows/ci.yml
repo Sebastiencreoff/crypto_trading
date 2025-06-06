@@ -1,9 +1,16 @@
+---
 name: CI
 
 on:
+  push:  # Add this section
+    branches:
+      - main
   pull_request:
     branches:
       - main
+    # Optionally, be more explicit about types
+    # types: [opened, synchronize, reopened]
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   build:
