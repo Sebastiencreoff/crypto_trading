@@ -7,6 +7,5 @@
     "connectionConfig" : "connectSimu.json",
     "algoConfig" : "algo.json",
     "initial_capital": 1000.0,
-    "slack_token": null,
     "slack_channel_id": null
 }

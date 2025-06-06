@@ -20,41 +20,49 @@ spec:
         ports:
         - containerPort: 8000
         env:
-        - name: APP_DB_HOST
-          value: "postgres-svc"
-        - name: APP_DB_PORT
-          value: "5432"
-        - name: APP_DB_TYPE
-          value: "postgresql"
-        - name: APP_DB_NAME
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: POSTGRES_DB
-        - name: APP_DB_USER
+        # Config file path - Central config will be read from here
+        - name: APP_CONFIG_FILE_PATH
+          value: "/etc/config/central_config.json"
+        # Database credentials from postgres-secret
+        - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_USER
-        - name: APP_DB_PASSWORD
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_PASSWORD
-        # Example of other config vars if needed:
-        # - name: ANOTHER_CONFIG_VAR
-        #   valueFrom:
-        #     configMapKeyRef:
-        #       name: trading-service-config # Ensure this ConfigMap exists if used
-        #       key: some_config_key
-        # volumeMounts:
+        # Binance API credentials from binance-secret
+        - name: BINANCE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: binance-secret
+              key: API_KEY
+        - name: BINANCE_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: binance-secret
+              key: API_SECRET
+        # Slack Bot Token from slack-secret
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: slack-secret
+              key: BOT_TOKEN
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
         # - name: trading-db-storage # This might not be needed if DB is external
         #   mountPath: /app/data
-      # volumes:
+      volumes:
+      - name: config-volume
+        configMap:
+          name: app-config
       # - name: trading-db-storage # This might not be needed if DB is external
       #   persistentVolumeClaim:
       #     claimName: trading-db-pvc
-
 ---
 apiVersion: v1
 kind: Service

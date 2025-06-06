@@ -1,4 +1,4 @@
-import json
+import os
 import logging
 
 from binance.client import Client
@@ -10,24 +10,36 @@ logger = logging.getLogger(__name__)
 
 
 class BinanceConnect(Connect):
-    def __init__(self, config_dict):
+    def __init__(self, exchange_config=None): # exchange_config can be an ExchangeConfig object or dict
         """
         Initializes the BinanceConnect client.
-        :param config_dict: Path to a JSON file containing api_key and api_secret.
+        API key and secret are sourced from environment variables:
+        BINANCE_API_KEY and BINANCE_API_SECRET.
+        Other settings like 'simulation' mode can be passed via exchange_config.
+        :param exchange_config: Optional. An object or dict containing non-secret
+                                 exchange parameters, e.g., from AppConfig.exchanges.
         """
+        self.api_key = os.environ.get("BINANCE_API_KEY")
+        self.api_secret = os.environ.get("BINANCE_API_SECRET")
+
+        if not self.api_key or not self.api_secret:
+            logger.error("BINANCE_API_KEY and/or BINANCE_API_SECRET environment variables not set.")
+            raise ValueError("Missing Binance API key/secret in environment variables.")
+
         try:
-            with open(config_dict, 'r') as f:
-                config = json.load(f)
-            self.api_key = config['api_key']
-            self.api_secret = config['api_secret']
             self.client = Client(self.api_key, self.api_secret)
+            # TODO: Handle 'simulation' mode or other settings from exchange_config if provided
+            # For example, if exchange_config has 'extra_settings':
+            # if exchange_config and hasattr(exchange_config, 'extra_settings') and exchange_config.extra_settings:
+            #     if exchange_config.extra_settings.get("simulation", False):
+            #         self.client.API_URL = Client.API_TESTNET_URL # Example for testnet
+            #         logger.info("Binance client initialized in TESTNET/SIMULATION mode.")
+            #     else:
+            #         logger.info("Binance client initialized in LIVE mode.")
+            # else:
+            #     logger.info("Binance client initialized (defaulting to LIVE mode).")
             logger.info("Binance client initialized successfully.")
-        except FileNotFoundError:
-            logger.error(f"Configuration file not found: {config_dict}")
-            raise
-        except KeyError:
-            logger.error("API key or secret not found in configuration file.")
-            raise
+
         except Exception as e:
             logger.error(f"Error initializing Binance client: {e}")
             raise

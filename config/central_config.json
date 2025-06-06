@@ -4,22 +4,17 @@
         "type": "postgresql",
         "host": "YOUR_POSTGRESQL_HOST",
         "port": 5432,
-        "username": "YOUR_POSTGRESQL_USERNAME",
-        "password": "YOUR_POSTGRESQL_PASSWORD",
         "name": "YOUR_POSTGRESQL_DBNAME"
     },
     "exchanges": [
         {
             "name": "binance",
-            "api_key": "YOUR_BINANCE_API_KEY",
-            "secret_key": "YOUR_BINANCE_API_SECRET",
             "extra_settings": {
                 "simulation": true
             }
         }
     ],
     "slack": {
-        "bot_token": "YOUR_SLACK_XOXB_BOT_TOKEN_PLACEHOLDER",
         "default_channel_id": "YOUR_SLACK_CHANNEL_ID_PLACEHOLDER"
     },
     "algorithms": [

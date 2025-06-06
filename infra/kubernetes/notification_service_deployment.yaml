@@ -19,18 +19,33 @@ spec:
         image: your-docker-registry/notification-service:latest # Placeholder - update with actual image
         ports:
         - containerPort: 8001
-        # env:
-        # - name: SLACK_BOT_TOKEN
-        #   valueFrom: # Example if token is from a Secret
-        #     secretKeyRef:
-        #       name: slack-credentials
-        #       key: bot_token
-        # - name: DEFAULT_CHANNEL_ID
-        #   valueFrom:
-        #     configMapKeyRef:
-        #       name: notification-service-config
-        #       key: default_channel_id
-
+        env:
+        - name: APP_CONFIG_FILE_PATH
+          value: "/etc/config/central_config.json"
+        # Inject all keys from postgres-secret as environment variables
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        # Inject SLACK_BOT_TOKEN from slack-secret
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: slack-secret
+              key: BOT_TOKEN
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: app-config
 ---
 apiVersion: v1
 kind: Service

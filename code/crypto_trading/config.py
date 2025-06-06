@@ -37,12 +37,16 @@ def get_engine():
             os.makedirs(db_dir, exist_ok=True)
 
         sqlalchemy_url = f"sqlite:///{db_path}"
-    elif db_conf.type == "postgresql": # Example for other DBs
-        sqlalchemy_url = f"postgresql://{db_conf.username}:{db_conf.password}@{db_conf.host}:{db_conf.port}/{db_conf.name}"
+    elif db_conf.type == "postgresql":
+        db_user = os.environ.get("POSTGRES_USER")
+        db_password = os.environ.get("POSTGRES_PASSWORD")
+        if not db_user or not db_password:
+            raise ValueError("POSTGRES_USER and POSTGRES_PASSWORD environment variables must be set for PostgreSQL connection.")
+        sqlalchemy_url = f"postgresql://{db_user}:{db_password}@{db_conf.host}:{db_conf.port}/{db_conf.name}"
     else:
         raise ValueError(f"Unsupported database type: {db_conf.type}")
 
-    logging.info(f"Creating SQLAlchemy engine for URL: {sqlalchemy_url}")
+    logging.info(f"Creating SQLAlchemy engine for URL using host: {db_conf.host} and db: {db_conf.name}") # Avoid logging credentials
     return create_engine(sqlalchemy_url)
 
 def get_session():
@@ -69,6 +73,14 @@ def init(config_file_path: str) -> AppConfig:
     try:
         app_config = load_config(config_file_path)
         logging.info(f"Configuration loaded successfully for service: {app_config.service_name}")
+
+        # Placeholder: Future subtasks will involve fetching exchange API keys and Slack tokens from env vars
+        # For example, for Binance:
+        # binance_api_key = os.environ.get("BINANCE_API_KEY")
+        # binance_secret_key = os.environ.get("BINANCE_API_SECRET")
+        # And for Slack:
+        # slack_bot_token = os.environ.get("SLACK_BOT_TOKEN")
+        # These would then be used by the respective service clients.
 
         # Example: Test database connection if configured
         if app_config.database:

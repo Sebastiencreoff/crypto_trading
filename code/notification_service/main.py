@@ -9,6 +9,8 @@ from config_management.schemas import AppConfig, SlackConfig as AppSlackConfig #
 from .slack_client import SlackNotifier
 from .models import NotificationRequest, NotificationResponse
 
+import os # Added for environment variable access
+
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -24,7 +26,12 @@ async def lifespan(app: FastAPI):
     logger.info("Notification Service starting up...")
 
     # Load main application configuration
-    config_file_path = "config/central_config.json" # Centralized config
+    config_file_path = os.environ.get("APP_CONFIG_FILE_PATH")
+    if not config_file_path:
+        logger.error("APP_CONFIG_FILE_PATH environment variable not set.")
+        raise RuntimeError("APP_CONFIG_FILE_PATH environment variable not set.")
+    logger.info(f"Loading configuration from: {config_file_path}")
+
     try:
         app_config = load_config(config_file_path)
         logger.info(f"Configuration loaded. Service name: {app_config.service_name}")

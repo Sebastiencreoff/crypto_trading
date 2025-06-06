@@ -1,58 +1,52 @@
-# Placeholder for future ConfigMap definitions.
-# Currently, central_config.json is bundled within the Docker images for both services.
-#
-# For future flexibility, parts of central_config.json or the entire file could be
-# externalized into a ConfigMap. This would allow configuration changes without
-# rebuilding Docker images.
-#
-# Example of how a ConfigMap might be structured:
-#
-# apiVersion: v1
-# kind: ConfigMap
-# metadata:
-#   name: app-central-config
-# data:
-#   central_config.json: |
-#     {
-#       "service_name": "shared_app_config",
-#       "database": {
-#         "type": "sqlite",
-#         "name": "/mnt/data/shared_app_data.db" // Path would need to be accessible via volume mount
-#       },
-#       "slack": {
-#         "bot_token": "OVERRIDDEN_BY_SECRET_OR_ENV_VAR", // Sensitive data better in Secrets
-#         "default_channel_id": "C12345678"
-#       },
-#       "exchanges": [
-#         {
-#           "name": "binance_live",
-#           "api_key": "OVERRIDDEN_BY_SECRET_OR_ENV_VAR",
-#           "secret_key": "OVERRIDDEN_BY_SECRET_OR_ENV_VAR"
-#         }
-#       ],
-#       "algorithms": [
-#         {
-#           "name": "default_algo",
-#           "parameters": {
-#             "some_param": "some_value_from_configmap"
-#           }
-#         }
-#       ],
-#       "other_settings": {
-#         "setting_from_configmap": true
-#       }
-#     }
-#
-# If this approach is adopted:
-# 1. Dockerfiles would be modified to NOT copy central_config.json.
-# 2. Applications (in their main.py or config_management/loader.py) would need to be
-#    updated to read the configuration from a file path specified by an environment
-#    variable, which would point to the mounted ConfigMap volume (e.g., /etc/config/central_config.json).
-# 3. Deployment YAMLs would need to define VolumeMounts for the containers and Volumes
-#    referencing this ConfigMap.
-#
-# For sensitive data like API keys or bot tokens, Kubernetes Secrets should be used
-# instead of or in conjunction with ConfigMaps, mounted as environment variables or files.
-
-# --- No actual ConfigMap resource defined in this iteration. ---
-# This file serves as a note for future enhancements.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  central_config.json: |
+    {
+        "service_name": "crypto_trader_main",
+        "database": {
+            "type": "postgresql",
+            "host": "YOUR_POSTGRESQL_HOST",
+            "port": 5432,
+            "name": "YOUR_POSTGRESQL_DBNAME"
+        },
+        "exchanges": [
+            {
+                "name": "binance",
+                "extra_settings": {
+                    "simulation": true
+                }
+            }
+        ],
+        "slack": {
+            "default_channel_id": "YOUR_SLACK_CHANNEL_ID_PLACEHOLDER"
+        },
+        "algorithms": [
+            {
+                "name": "default_algo",
+                "parameters": {
+                    "maxLost": {
+                        "percentage": 3,
+                        "percentage_update": 0.25,
+                        "mean": 720
+                    },
+                    "takeProfit": {
+                        "percentage": 5.0
+                    },
+                    "AIAlgo": {
+                        "enabled": true,
+                        "model_path": "./models/ai_algo_model.pth"
+                    }
+                }
+            }
+        ],
+        "other_settings": {
+            "currency": "BTCUSDT",
+            "transaction_amount": 100,
+            "delay_seconds": 60,
+            "initial_capital": 0.0
+        },
+        "notification_service_url": "http://notification-service-svc:8001"
+    }

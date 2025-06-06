@@ -14,8 +14,6 @@ class DatabaseConfig(BaseModel):
     type: str = Field(default="postgresql")
     host: str = Field(default="localhost")
     port: int = Field(default=5432)
-    username: str = Field(default="user")
-    password: str = Field(default="password")
     name: str = Field(default="mydb")
 
     if IS_PYDANTIC_V2:
@@ -27,14 +25,11 @@ class DatabaseConfig(BaseModel):
 
 class ExchangeConfig(BaseModel):
     name: str
-    api_key: str
-    secret_key: str
     base_url: Optional[HttpUrl] = None
     # For exchange-specific settings not covered by the above
     extra_settings: Optional[Dict] = None
 
 class SlackConfig(BaseModel):
-    bot_token: str # Slack Bot User OAuth Token (xoxb-...)
     default_channel_id: str # Default channel ID to send messages to (e.g., C12345678)
 
 class AlgoConfig(BaseModel):
