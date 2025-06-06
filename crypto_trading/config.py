@@ -1,134 +1,87 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import json
 import logging
 import os
+# Import the new config loader and schema
+from config_management.loader import load_config
+from config_management.schemas import AppConfig
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+# Global variable to hold the loaded configuration
+# This will be an instance of AppConfig after initialization
+app_config: AppConfig = None
 
-import boto3
-from botocore.exceptions import ClientError
+def get_engine():
+    """
+    Provides a SQLAlchemy engine based on the loaded configuration.
+    This function will need to be adapted or moved depending on how database
+    connections are managed with the new AppConfig.
+    For now, it's a placeholder or needs to be adapted if still used directly.
+    """
+    if app_config is None:
+        raise RuntimeError("Configuration not initialized. Call config.init() first.")
 
-class Config:
-    def __init__(self, config_file_path): # Renamed config_file to config_file_path for clarity
-        # Ensure config_file_path is absolute
-        abs_config_file_path = os.path.abspath(config_file_path)
+    # Example: Construct SQLAlchemy URL from app_config.database
+    # This is a simplified example and might need adjustment based on actual DB types and needs
+    from sqlalchemy import create_engine
+    db_conf = app_config.database
+    if db_conf.type == "sqlite":
+        # Assuming db_conf.name is a relative path from base_config_path or an absolute path
+        db_path = db_conf.name
+        if app_config.base_config_path and not os.path.isabs(db_path):
+            db_path = os.path.join(app_config.base_config_path, db_path)
 
-        with open(abs_config_file_path, mode='r') as f:
-            self.config_data = json.load(f)
+        # Ensure the directory for the SQLite DB exists
+        db_dir = os.path.dirname(db_path)
+        if db_dir: # Create directory if it's not the current directory and doesn't exist
+            os.makedirs(db_dir, exist_ok=True)
 
-        try:
-            # self.dir_path should be the directory of the config file itself
-            self.dir_path = os.path.dirname(abs_config_file_path) + '/'
+        sqlalchemy_url = f"sqlite:///{db_path}"
+    elif db_conf.type == "postgresql": # Example for other DBs
+        sqlalchemy_url = f"postgresql://{db_conf.username}:{db_conf.password}@{db_conf.host}:{db_conf.port}/{db_conf.name}"
+    else:
+        raise ValueError(f"Unsupported database type: {db_conf.type}")
 
-            # Ensure database_file path is absolute or relative to config file dir
-            db_file_name = self.config_data['database_file']
-            if not os.path.isabs(db_file_name):
-                self.database_file = os.path.join(self.dir_path, db_file_name)
-            # Slack integration settings (optional)
-            self.slack_token = self.config_data.get('slack_token')
-            self.slack_channel_id = self.config_data.get('slack_channel_id')
+    logging.info(f"Creating SQLAlchemy engine for URL: {sqlalchemy_url}")
+    return create_engine(sqlalchemy_url)
 
-            # Initial capital for portfolio graphing (optional, defaults to 0.0)
-            self.initial_capital = float(self.config_data.get('initial_capital', 0.0))
+def get_session():
+    """
+    Provides a SQLAlchemy session.
+    Similar to get_engine, this will rely on the initialized app_config.
+    """
+    # This is a simplified example. Session factory management might be needed.
+    from sqlalchemy.orm import sessionmaker
+    engine = get_engine() # Relies on the new get_engine()
+    session_factory = sessionmaker(bind=engine)
+    logging.info("SQLAlchemy session factory created.")
+    return session_factory()
 
-            # Database  name
-            self.pricing = 'Pricing'
-            self.db_conn = None
-        except KeyError:
-            logging.exception('error in configuration file')
+def init(config_file_path: str) -> AppConfig:
+    """
+    Initializes the application configuration using the new config management system.
+    Loads the configuration from the given path, validates it, and stores it
+    in the global `app_config` variable.
+    """
+    global app_config
+    logging.info(f"Initializing configuration from: {config_file_path} using new config management.")
 
-    def get_db_credentials_from_secrets_manager(self):
-        """Fetch DB credentials from AWS Secrets Manager."""
-        if not self.db_secret_name:
-            logging.error("DB_SECRET_NAME environment variable is not set.")
-            raise ValueError("DB_SECRET_NAME not set for RDS configuration.")
+    try:
+        app_config = load_config(config_file_path)
+        logging.info(f"Configuration loaded successfully for service: {app_config.service_name}")
 
-        logging.info(f"Fetching DB credentials from Secrets Manager: {self.db_secret_name}")
-        client = boto3.client('secretsmanager')
-        try:
-            get_secret_value_response = client.get_secret_value(SecretId=self.db_secret_name)
-        except ClientError as e:
-            logging.error(f"Error fetching secret: {e}")
-            raise
-        else:
-            if 'SecretString' in get_secret_value_response:
-                secret = get_secret_value_response['SecretString']
-                return json.loads(secret)
-            else:
-                self.database_file = db_file_name
+        # Example: Test database connection if configured
+        if app_config.database:
+            try:
+                engine = get_engine()
+                with engine.connect() as connection:
+                    logging.info("Database connection successful via SQLAlchemy engine.")
+            except Exception as e:
+                logging.error(f"Failed to connect to database {app_config.database.name} using SQLAlchemy engine: {e}", exc_info=True)
+                # Depending on requirements, you might want to raise e here
+                # or allow the application to continue if DB is not critical at init.
+    except Exception as e:
+        logging.error(f"Failed to initialize application configuration: {e}", exc_info=True)
+        raise # Re-raise the exception to prevent application from starting in a bad state
 
-            self.sqlalchemy_database_url = f"sqlite:///{os.path.abspath(self.database_file)}"
-
-            self.currency = self.config_data['currency']
-            self.transaction_amt = self.config_data['transactionAmt']
-            self.connection_type = self.config_data['connection'] # Renamed from self.connection
-
-            connection_cfg_name = self.config_data['connectionConfig']
-            if not os.path.isabs(connection_cfg_name):
-                self.connection_config_path = os.path.join(self.dir_path, connection_cfg_name)
-            else:
-                self.connection_config_path = connection_cfg_name
-
-            # Load algo_config_dict from the file specified in main config
-            algo_cfg_name = self.config_data['algoConfig']
-            if not os.path.isabs(algo_cfg_name):
-                algo_config_file_path = os.path.join(self.dir_path, algo_cfg_name)
-            else:
-                algo_config_file_path = algo_cfg_name
-
-
-            if os.path.exists(algo_config_file_path):
-                with open(algo_config_file_path, 'r') as f_algo:
-                    self.algo_config_dict = json.load(f_algo)
-            else:
-                logging.warning(f"Algorithm configuration file not found: {algo_config_file_path}")
-                self.algo_config_dict = {} # Default to empty dict if file not found
-
-            self.delay_secs = self.config_data['delay'] # Renamed from self.delay
-
-            # SQLAlchemy engine and session factory, initialized lazily
-            self._engine = None
-            self._session_factory = None
-
-            # Removed: self.pricing = 'Pricing'
-            # Removed: self.db_conn = None (SQLObject specific)
-
-        except KeyError as e:
-            logging.exception(f'Error in configuration file: Missing key {e}')
-            raise # Re-raise the exception to make it clear config loading failed
-
-    def get_engine(self):
-        if self._engine is None:
-            if not self.sqlalchemy_database_url:
-                raise ValueError("SQLAlchemy database URL is not set.")
-            logging.info(f"Creating SQLAlchemy engine for URL: {self.sqlalchemy_database_url}")
-            self._engine = create_engine(self.sqlalchemy_database_url)
-        return self._engine
-
-    def get_session(self):
-        if self._session_factory is None:
-            engine = self.get_engine()
-            self._session_factory = sessionmaker(bind=engine)
-            logging.info("SQLAlchemy session factory created.")
-        return self._session_factory()
-
-    # Removed setup_db(self) method
-
-
-def init(config_file_path): # Renamed config_file to config_file_path
-    """Initializes and returns a Config object."""
-    logging.info(f"Initializing configuration from: {config_file_path}")
-    conf = Config(config_file_path)
-    # Removed: conf.setup_db()
-    # Optionally, can try to establish a DB connection here to catch errors early
-    # try:
-    #     engine = conf.get_engine()
-    #     with engine.connect() as connection: # Test connection
-    #         logging.info("Database connection successful via SQLAlchemy engine.")
-    # except Exception as e:
-    #     logging.error(f"Failed to connect to database using SQLAlchemy engine: {e}", exc_info=True)
-    #     raise
-    return conf
+    return app_config

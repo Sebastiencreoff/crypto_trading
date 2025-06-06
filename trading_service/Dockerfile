@@ -1,0 +1,41 @@
+# Use an appropriate Python base image
+FROM python:3.10-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the requirements file and install dependencies
+COPY ../requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy necessary application code and configuration files
+# Assuming Dockerfile is in trading_service/ and these paths are relative to project root
+
+# Option 1: Copy individual directories from project root context
+# This requires the Docker build context to be the project root.
+COPY ./trading_service /app/trading_service
+COPY ./config_management /app/config_management
+COPY ./crypto_trading/database /app/crypto_trading/database
+COPY ./config/central_config.json /app/config/central_config.json
+COPY ./alembic /app/alembic
+COPY ./alembic.ini /app/alembic.ini
+
+# If the Docker build context is set to the `trading_service` directory itself,
+# then paths would need to be relative like `../config_management`.
+# However, standard practice is to set context to project root and use paths from there.
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Define the command to run the application
+# This assumes uvicorn is installed via requirements.txt and available in PATH.
+# It also assumes that the application is structured such that trading_service.main is runnable.
+# The PYTHONPATH will include /app by default. If crypto_trading.database or config_management
+# are not found, PYTHONPATH adjustments might be needed, or app structure should ensure they are discoverable.
+# Given `prepend_sys_path = .` in alembic.ini and similar logic in services, running from /app
+# with code copied into /app should make modules findable if they are structured as packages.
+CMD ["uvicorn", "trading_service.main:app", "--host", "0.0.0.0", "--port", "8000"]

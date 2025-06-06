@@ -1,0 +1,51 @@
+{
+    "service_name": "crypto_trader_main",
+    "database": {
+        "type": "sqlite",
+        "host": "",
+        "port": 0,
+        "username": "",
+        "password": "",
+        "name": "./BINANCE_TRADES.db"
+    },
+    "exchanges": [
+        {
+            "name": "binance",
+            "api_key": "YOUR_BINANCE_API_KEY",
+            "secret_key": "YOUR_BINANCE_API_SECRET",
+            "extra_settings": {
+                "simulation": true
+            }
+        }
+    ],
+    "slack": {
+        "bot_token": "YOUR_SLACK_XOXB_BOT_TOKEN_PLACEHOLDER",
+        "default_channel_id": "YOUR_SLACK_CHANNEL_ID_PLACEHOLDER"
+    },
+    "algorithms": [
+        {
+            "name": "default_algo",
+            "parameters": {
+                "maxLost": {
+                    "percentage": 3,
+                    "percentage_update": 0.25,
+                    "mean": 720
+                },
+                "takeProfit": {
+                    "percentage": 5.0
+                },
+                "AIAlgo": {
+                    "enabled": true,
+                    "model_path": "./models/ai_algo_model.pth"
+                }
+            }
+        }
+    ],
+    "other_settings": {
+        "currency": "BTCUSDT",
+        "transaction_amount": 100,
+        "delay_seconds": 60,
+        "initial_capital": 0.0
+    },
+    "notification_service_url": "http://notification-service-svc:8001"
+}

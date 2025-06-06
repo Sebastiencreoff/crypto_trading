@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+.venv/
+env/
+venv/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+*.so
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Other
+*.log
+*.db
+*.sqlite3
+*~
+*.swp
+*.bak
+
+# Specific to this project if any (e.g., local test data)
+# /local_data/
+# /tests/tmp/
+models/ # If models are downloaded/generated and large
+*.pth # PyTorch models, if any outside version control
+crypto_trading_dev.db # Alembic's default DB
+BINANCE_TRADES.db # Default DB from central_config for services
+# Add other specific files or directories to ignore during docker build
+# For example, if requirements.txt is generated from pyproject.toml,
+# you might not need to copy both if only one is used in Dockerfile.
+# poetry.lock # If using poetry and pyproject.toml
+# pyproject.toml # If using poetry
+
+# Keep config files, but maybe not all of them if some are sensitive and injected differently
+# config/ # This is too broad, we need central_config.json
+# !config/central_config.json # This doesn't work, .dockerignore is deny by default
+
+# Keep alembic files
+# !alembic/
+# !alembic.ini
+
+# Keep service directories
+# !trading_service/
+# !notification_service/
+# !config_management/
+# !crypto_trading/database/
+# The above ! are not needed as we copy them explicitly.
+# We just need to ensure that other junk is ignored.
+# If pyproject.toml and poetry.lock are in root, they will be copied.
+# If requirements.txt is used, it should be in root too.
+# For now, assume pyproject.toml/poetry.lock are NOT used, and requirements.txt will be made.
+# If they ARE used, then the Dockerfiles should copy them.
+# For this exercise, the Dockerfiles will assume requirements.txt.
+# So, ensure pyproject.toml and poetry.lock are ignored IF requirements.txt is the source of truth for docker.
+# If pyproject.toml + poetry is the source of truth, then these should NOT be in .dockerignore.
+# Given the project setup does not show Poetry yet, I will assume pip/requirements.txt.
+# Thus, pyproject.toml and poetry.lock can be ignored if they exist for other local dev.
+pyproject.toml
+poetry.lock

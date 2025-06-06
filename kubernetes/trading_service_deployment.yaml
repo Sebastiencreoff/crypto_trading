@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-service
+  labels:
+    app: trading-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-service
+  template:
+    metadata:
+      labels:
+        app: trading-service
+    spec:
+      containers:
+      - name: trading-service-container
+        image: your-docker-registry/trading-service:latest # Placeholder - update with actual image
+        ports:
+        - containerPort: 8000
+        # env:
+        # - name: DATABASE_URL
+        #   value: "sqlite:////app/data/BINANCE_TRADES.db" # Example if DB path needs to be configurable
+        # - name: ANOTHER_CONFIG_VAR
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: trading-service-config
+        #       key: some_config_key
+        # volumeMounts:
+        # - name: trading-db-storage
+        #   mountPath: /app/data # Example if using PV/PVC for SQLite
+      # volumes:
+      # - name: trading-db-storage
+      #   persistentVolumeClaim:
+      #     claimName: trading-db-pvc # Example PVC name
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-service-svc
+  labels:
+    app: trading-service
+spec:
+  type: ClusterIP # Exposes the service on an internal IP in the cluster
+  selector:
+    app: trading-service # Matches the labels of the pods
+  ports:
+  - protocol: TCP
+    port: 8000 # Port on which the service is available internally
+    targetPort: 8000 # Port on the pod/container that the service forwards traffic to

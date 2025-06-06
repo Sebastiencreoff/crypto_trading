@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+SQLAlchemy
+# psycopg2-binary # Not needed for SQLite, include if PostgreSQL is used
+slack_sdk
+alembic
+python-dotenv # Explicitly listed, though also a sub-dependency of uvicorn[standard]
+httpx # For making HTTP requests from service to service & testing FastAPI endpoints
+
+# Testing frameworks
+pytest
+pytest-cov
+pytest-asyncio
+respx # For mocking HTTP requests (alternative: pytest-httpx)
