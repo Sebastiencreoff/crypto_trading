@@ -1,7 +1,6 @@
-# pythonTrading
-Automated cryptocurrency trading bot.
+# Python Trading Service
 
-This project provides a framework for implementing and running various trading algorithms for cryptocurrencies.
+This project is a FastAPI-based **trading-service** designed to manage and execute automated cryptocurrency trading tasks. These tasks, which run individual trading algorithms, are orchestrated as Kubernetes Jobs. The service includes integrated Slack notifications for monitoring and basic interaction.
 
 ## Features
 - Multiple algorithm support (GuppyMMA, Bollinger Bands, Moving Average Crossover, AI-based).
@@ -9,45 +8,37 @@ This project provides a framework for implementing and running various trading a
 - Extensible algorithm interface (`AlgoIf`).
 
 ## Setup
-1. Clone the repository.
-2. Install dependencies: `pip install -e .[test]` (This command uses `config/pyproject.toml` to build and install the package in editable mode with test dependencies. Run from the project root).
-3. **Database Setup (PostgreSQL):**
-    - This application uses PostgreSQL as its database backend.
-    - Ensure you have a running PostgreSQL instance.
-    - Create a database and a user with appropriate permissions for the application.
-    - Configure the database connection details (host, port, username, password, database name) in `config/central_config.json`.
 
-## Kubernetes PostgreSQL Deployment
+1.  **Clone the repository.**
+2.  **Install dependencies:**
+    ```bash
+    pip install -e .[test]
+    ```
+    This command uses `config/pyproject.toml` to build and install the package in editable mode with test dependencies. Run from the project root.
+3.  **Database Setup (PostgreSQL):**
+    *   The application requires a PostgreSQL database.
+    *   For local development with Kubernetes (recommended), refer to the `docs/k3d_guide.md` for detailed instructions on setting up PostgreSQL within a k3d cluster.
+    *   General database configuration (connection details) is managed via `config/central_config.json` and can be overridden by environment variables in Kubernetes deployments (see `docs/k3d_guide.md`).
+4.  **Configuration:**
+    *   Trading parameters, API keys (if not using simulation), and Slack settings are primarily configured in `config/central_config.json` (or its equivalent in a Kubernetes ConfigMap).
+    *   The `SLACK_BOT_TOKEN` is expected as an environment variable for the `trading-service`.
+    *   Binance API keys are also typically managed via environment variables or Kubernetes secrets if live trading is intended.
 
-For deployments within a Kubernetes cluster, PostgreSQL can be deployed directly as a service within the cluster. The necessary Kubernetes manifests are located in the `infra/kubernetes/` directory:
+## Deployment (Local Development with k3d)
 
-*   `postgres-secret.yaml`: Manages database credentials (username, password) and the default database name. **Note:** The default password in the manifest is for development purposes and should be changed for production environments.
-*   `postgres-service.yaml`: Defines the internal Kubernetes service (`postgres-svc`) for accessing the database.
-*   `postgres-statefulset.yaml`: Manages the PostgreSQL pod, ensuring persistent storage via `PersistentVolumeClaim`s.
+The application is designed to be deployed on Kubernetes. For local development and testing, a lightweight k3d (Kubernetes in Docker) environment is recommended.
 
-The main application (e.g., `trading-service`) is configured to connect to this internal PostgreSQL instance via environment variables that override settings from `config/central_config.json`. These environment variables are injected into the application's deployment manifest (e.g., `infra/kubernetes/trading_service_deployment.yaml`) and include:
+**Comprehensive setup instructions are available in: [`docs/k3d_guide.md`](docs/k3d_guide.md)**
 
-*   `APP_DB_HOST`: Set to `postgres-svc`.
-*   `APP_DB_PORT`: Set to `5432`.
-*   `APP_DB_NAME`: Sourced from `postgres-secret`.
-*   `APP_DB_USER`: Sourced from `postgres-secret`.
-*   `APP_DB_PASSWORD`: Sourced from `postgres-secret`.
-*   `APP_DB_TYPE`: Set to `postgresql`.
-
-The `code/config_management/schemas.py` file has been updated to ensure the `DatabaseConfig` model can be populated from these environment variables.
-
-**Accessing the Database (for Debugging):**
-
-To access the PostgreSQL database directly for debugging or administrative tasks from your local machine, you can use `kubectl port-forward`. For example:
-
-```bash
-# Forward local port 5433 to the PostgreSQL service port 5432
-kubectl port-forward service/postgres-svc 5433:5432
-```
-
-You can then connect to `localhost:5433` using any PostgreSQL client (e.g., `psql`, pgAdmin) with the credentials defined in `postgres-secret` (or your production credentials if changed).
-
-4. Configure your trading parameters and API keys in the relevant configuration files located in the `config/` directory.
+This guide covers:
+*   Setting up a k3d cluster.
+*   Building and loading Docker images (`trading-service`, `trading-task`).
+*   Configuring Kubernetes secrets (PostgreSQL, Binance API, Slack).
+*   Setting up the ConfigMap for `central_config.json`.
+*   Deploying PostgreSQL.
+*   Deploying the Trading Service.
+*   Setting up RBAC for task management.
+*   Verifying the deployment and accessing the service.
 
 ## Exchange Configuration
 
@@ -169,93 +160,65 @@ class PlaceholderNet(nn.Module):
         return self.linear(x)
 ```
 
-## Running the Bot
-After installation, execute the trading bot using the configured entrypoint:
-```bash
-trading -c config/your_trading_config.json
-```
-Replace `config/your_trading_config.json` with your desired configuration file (e.g., `config/trading_SIMU.json`).
-Alternatively, to run directly using Python (e.g., for development):
-```bash
-python code/crypto_trading/main.py -c config/your_trading_config.json
-```
+## Running the Service
+
+The application is run as the `trading-service` deployed on Kubernetes. It is not typically run as a standalone command-line bot anymore.
+
+Please refer to the **[`docs/k3d_guide.md`](docs/k3d_guide.md)** for detailed instructions on deploying and running the service in a local Kubernetes environment. The guide includes steps to build Docker images, set up Kubernetes resources, and interact with the deployed service.
 
 ## Slack Integration
 
-The trading bot can be monitored and controlled via Slack messages.
+The `trading-service` includes integrated Slack notification capabilities. It can send updates about trading activities and can be interacted with via basic Slack commands.
 
 ### Setup
-
-To enable Slack integration, you need to configure your Slack Bot User OAuth Token and the target Slack Channel ID in your JSON configuration file (e.g., `config/trading_SIMU.json` or `config/trading_COINBASE.json`).
 
 1.  **Create a Slack App and Bot User:**
     *   Go to [api.slack.com/apps](https://api.slack.com/apps) and create a new app.
     *   Add a "Bot User" to your app.
-    *   Under "OAuth & Permissions", find the "Bot User OAuth Token". It usually starts with `xoxb-`. This is your `slack_token`.
-    *   Ensure your bot token has the necessary permissions (scopes). Required scopes typically include:
-        *   `chat:write`: To send messages.
-        *   `app_mentions:read`: To read messages that @mention your bot (if you want to command it outside the designated channel).
-        *   `channels:history`, `groups:history`, `im:history`, `mpim:history`: For the RTM client to receive messages in channels and DMs. Generally, scopes like `channels:read` and `groups:read` might also be needed depending on your setup. The RTM client needs to "see" messages.
+    *   Under "OAuth & Permissions", find the "Bot User OAuth Token" (starts with `xoxb-`).
+    *   Grant necessary OAuth scopes. For sending messages, `chat:write` is essential. If you plan to extend functionality to read messages or use RTM, add scopes like `app_mentions:read`, `channels:history`, `groups:history`, etc.
 
-2.  **Get Channel ID:**
-    *   The `slack_channel_id` is the ID of the public channel where the bot will primarily listen and post. You can find this by right-clicking the channel name in Slack and selecting "Copy Link". The ID is the last part of the URL (e.g., `C1234567890`).
+2.  **Set Environment Variable:**
+    *   The `trading-service` expects the Slack Bot Token to be provided via the `SLACK_BOT_TOKEN` environment variable.
+    *   When deploying to Kubernetes, this is typically done by creating a Secret and mounting it as an environment variable in the `trading-service` deployment. Refer to `docs/k3d_guide.md` for an example.
 
-3.  **Update Configuration File:**
-    Add the following keys to your main JSON configuration file. The `initial_capital` is used as the baseline for the portfolio value graph. If not set, it defaults to `0.0`.
-    ```json
-    {
-      // ... other configurations ...
-      "initial_capital": 1000.0, // Your starting capital in the base currency
-      "slack_token": "xoxb-your-bot-user-oauth-token-here",
-      "slack_channel_id": "C1234567890"
-      // ... other configurations ...
-    }
-    ```
-    Replace the placeholder values with your actual token, channel ID, and desired initial capital. If `slack_token` or `slack_channel_id` are missing or `null`, Slack integration will be disabled.
+3.  **Configure Default Channel:**
+    *   The default Slack channel ID for notifications is configured in `config/central_config.json` (or its ConfigMap equivalent) under the `slack.default_channel_id` key.
+    *   To get a channel ID, right-click the channel name in Slack, select "Copy Link". The ID is the last part of the URL (e.g., `C1234567890`).
 
 4.  **Invite Bot to Channel:**
-    *   Don't forget to invite your bot user to the channel specified by `slack_channel_id` in Slack.
+    *   Invite your bot user to the default channel in your Slack workspace.
 
-### Usage
+### Functionality
 
-Once configured and the bot is running, it will listen for commands in two ways:
-1.  Messages posted in the channel specified by `slack_channel_id`.
-2.  Direct mentions of the bot (e.g., `@YourBotName command`) in any channel the bot is a member of.
-
-**Available Commands:**
-
-*   `start`: (Currently informational) Checks if the trading bot is running. If the bot was fully stopped, this command cannot restart it from Slack due to the current application design; a manual restart of the application would be needed. It will confirm if the bot is already operational.
-*   `stop`: Stops the trading bot. The bot will finish any current processing cycle and then cease further trading activity.
-*   `status`: Reports whether the bot is currently running and displays the latest profit/loss figures.
-*   `graph`: Generates and uploads a line graph showing the portfolio value over time. The portfolio value is calculated as `Initial Capital + Cumulative Profits` from closed trades.
-*   `pnl_chart`: Generates and uploads a bar chart showing the profit or loss for each completed trade, ordered chronologically by sell time.
+*   The `trading-service` will send notifications for significant events (e.g., task start/stop, errors, trades) to the configured default Slack channel.
+*   The previous Slack command interface (e.g., `status`, `graph` commands via RTM client) that was part of `run_slack_handler.py` is currently **not** active in the `trading-service` by default. The primary interaction model is now through the `trading-service` API. The `send_slack_notification` utility is used internally by the service.
+*   A debug API endpoint `/debug/notify` (if enabled in `trading_service/main.py`) can be used to test sending messages via Slack.
 
 ### Troubleshooting
 
-*   **Bot Not Responding:**
-    *   Check the application logs for any error messages related to Slack initialization (e.g., "invalid token", "channel not found") or API communication issues.
-    *   Ensure the `slack_token` and `slack_channel_id` in your configuration file are correct.
-    *   Verify that the bot user has been invited to the channel specified by `slack_channel_id`.
-    *   Confirm the bot has the correct OAuth scopes/permissions in the Slack App settings.
+*   Check `trading-service` logs for any Slack-related error messages (e.g., "invalid token", "channel not found").
+*   Ensure `SLACK_BOT_TOKEN` environment variable is correctly set for the `trading-service` pods.
+*   Verify the `default_channel_id` in the configuration is correct and the bot is a member of that channel.
+*   Confirm the bot has the necessary OAuth scopes.
 
 ## Database Migrations (Alembic)
-Alembic is used to manage database schema migrations for the application, supporting the PostgreSQL database. It allows for versioning of the database schema as the application evolves.
 
-**Configuration and Placement:**
-- The Alembic migration scripts are located in `code/alembic/`.
-- The Alembic configuration file is `config/alembic.ini`. This file, along with `code/alembic/env.py`, is configured to read database connection details from `config/central_config.json`.
+Alembic is used to manage database schema migrations.
+- Migration scripts: `code/alembic/`
+- Configuration: `config/alembic.ini` (reads DB connection from `config/central_config.json` or environment variables).
 
 **Running Alembic Commands:**
-Before running migrations, ensure your `config/central_config.json` is correctly set up for your PostgreSQL instance.
-To run Alembic commands, you'll typically need to specify the path to the configuration file. From the project root:
+Ensure `config/central_config.json` (or equivalent environment variables for Kubernetes) points to your database.
+From the project root:
 ```bash
 # Example: Create a new migration
-alembic -c config/alembic.ini revision -m "create_new_table"
+alembic -c config/alembic.ini revision -m "your_migration_message"
 
-# Example: Apply all pending migrations to the database
+# Example: Apply all pending migrations
 alembic -c config/alembic.ini upgrade head
 ```
-The `config/alembic.ini` file is configured with `script_location = ../code/alembic` (relative to `config/alembic.ini` itself) and `prepend_sys_path = ..` (to add the project root to the Python path), which helps Alembic locate the migration scripts and your application's database models correctly.
+The `config/alembic.ini` is configured to find migration scripts and application models. For Kubernetes deployments, database migrations should typically be run as an Init Container or a separate Job before the main application starts.
 
 ## Disclaimer
 Trading cryptocurrencies involves significant risk. This software is provided "as is", without warranty of any kind. Use at your own risk.
