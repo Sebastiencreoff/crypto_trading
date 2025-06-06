@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service-container
+        image: your-docker-registry/notification-service:latest # Placeholder - update with actual image
+        ports:
+        - containerPort: 8001
+        # env:
+        # - name: SLACK_BOT_TOKEN
+        #   valueFrom: # Example if token is from a Secret
+        #     secretKeyRef:
+        #       name: slack-credentials
+        #       key: bot_token
+        # - name: DEFAULT_CHANNEL_ID
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: notification-service-config
+        #       key: default_channel_id
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service-svc
+  labels:
+    app: notification-service
+spec:
+  type: ClusterIP # Exposes the service on an internal IP in the cluster
+  selector:
+    app: notification-service # Matches the labels of the pods
+  ports:
+  - protocol: TCP
+    port: 8001 # Port on which the service is available internally
+    targetPort: 8001 # Port on the pod/container that the service forwards traffic to
