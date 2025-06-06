@@ -1,7 +1,17 @@
 import multiprocessing
+import threading # Added for the first subtask
 import uuid
-from .trading import Trading # Uncommented
 # from .config import Config # Config is now passed into Task
+
+# Conditional import for Trading
+try:
+    from .trading import Trading
+except ImportError:
+    # This allows the script to run standalone for testing if .trading is not found
+    # __main__ block will define a MockTrading and assign it to Trading
+    if __name__ != '__main__': # If not in main, and import failed, it's a real problem
+        raise
+    Trading = None # Placeholder, will be replaced by MockTrading in __main__
 
 class Task:
     def __init__(self, config_obj):
@@ -48,7 +58,7 @@ class Task:
                 pipe_active = False # Ensure listener exits
 
         try:
-            stop_listener_thread = multiprocessing.Process(target=_listen_for_stop) # Run in separate process/thread
+            stop_listener_thread = threading.Thread(target=_listen_for_stop) # Changed for the first subtask
             stop_listener_thread.start()
 
             trading_instance.run() # This is the main blocking call
@@ -62,9 +72,7 @@ class Task:
             pipe_active = False # Signal listener thread to exit
             if stop_listener_thread and stop_listener_thread.is_alive():
                  stop_listener_thread.join(timeout=1) # Wait for listener to exit
-            if stop_listener_thread and stop_listener_thread.is_alive(): # If still alive
-                 stop_listener_thread.terminate() # Force terminate
-                 stop_listener_thread.join()
+            # Removed terminate() for Thread as per the first subtask
 
             if not stop_event_for_trading.is_set(): # Ensure it's set if trading_instance.run() exited unexpectedly
                 stop_event_for_trading.set()
@@ -210,84 +218,114 @@ if __name__ == '__main__':
 
     # It's better to test this with TaskManager and a proper Config setup.
     # The following example is simplified and focuses on Task mechanics.
+    import logging # Added for MockConfig and MockTrading
+    import time    # Added for MockTrading
 
     class MockConfig:
-        def __init__(self, currency, delay=1, connection_type="simulation"):
+        def __init__(self, currency, delay=0.2, connection_type="simulation"): # Reduced delay
             self.currency = currency
-            self.delay_secs = delay # Expected by refactored Trading
-            self.transaction_amt = 100 # Expected
-            self.db_conn = mock_db_conn # Expected
+            self.delay_secs = delay
+            self.transaction_amt = 100
+            self.db_conn = mock_db_conn
             self.connection_type = connection_type
-            # Provide dummy connection_config and dir_path for simulation
-            self.connection_config = {} # Dummy
-            self.dir_path = "."         # Dummy
-            # Provide dummy algo_config
-            self.algo_config = {}       # Dummy
+            self.connection_config = {}
+            self.dir_path = "."
+            self.algo_config = {}
+            # Ensure logging is configured minimally for MockConfigLogger to work without error
+            if not logging.getLogger("MockConfigLogger").hasHandlers():
+                logging.basicConfig(level=logging.INFO) # Basic config
             self.logger = logging.getLogger("MockConfigLogger")
 
+    class MockTrading:
+        def __init__(self, config_obj, task_id, stop_event, results_queue):
+            self.config_obj = config_obj
+            self.task_id = task_id
+            self.stop_event = stop_event
+            self.results_queue = results_queue
+            self.logger = logging.getLogger(f"MockTrading_{self.task_id}")
+            if not self.logger.hasHandlers(): # Ensure handlers are set up
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                handler.setFormatter(formatter)
+                self.logger.addHandler(handler)
+                self.logger.setLevel(logging.INFO)
+            self.logger.info(f"MockTrading {self.task_id} initialized.")
 
-    # task_config = {"currency_pair": "BTC/USD", "amount": 100} # Old style
-    task_config_obj = MockConfig(currency="BTC/USD")
-    t = Task(task_config_obj)
-    print("Creating task...")
-    task_config = {"currency_pair": "BTC/USD", "amount": 100}
-    t = Task(task_config)
-    print(f"Task ID: {t.task_id}, Status: {t.get_status()}")
+        def run(self):
+            self.logger.info(f"MockTrading {self.task_id} starting run.")
+            self.results_queue.put(f"MockTrading for {self.task_id}: Started.") # Send a simple string result
+            try:
+                for i in range(5): # Simulate some work
+                    if self.stop_event.is_set():
+                        self.logger.info(f"MockTrading {self.task_id} stop event detected at iteration {i}.")
+                        self.results_queue.put(f"MockTrading for {self.task_id}: Stopped during iteration {i}.")
+                        return
+                    self.logger.info(f"MockTrading {self.task_id} working... {i+1}/5, delay: {self.config_obj.delay_secs}s")
+                    time.sleep(self.config_obj.delay_secs)
+                self.results_queue.put(f"MockTrading for {self.task_id}: Completed normally.")
+                self.logger.info(f"MockTrading {self.task_id} finished run normally.")
+            except Exception as e:
+                self.logger.error(f"MockTrading {self.task_id}: Exception during run: {e}", exc_info=True)
+                self.results_queue.put(f"MockTrading for {self.task_id}: Errored: {e}")
 
-    print("Starting task...")
-    t.start()
-    # Status might be 'starting' initially, then 'running' after _task_runner sends update
-    multiprocessing.Event().wait(0.5) # Give it a moment to start and update status
-    print(f"Task ID: {t.task_id}, Status: {t.get_status()}")
+    # Conditional Trading assignment for testing
+    # This must be done carefully if 'Trading' is already imported at module top 'from .trading import Trading'
+    # The simplest way for this specific test is to shadow the global 'Trading' inside __main__
+    # Note: The prompt asks to modify the import at the top. This is tricky without knowing its exact original form.
+    # For now, we shadow it here. If the original `from .trading import Trading` causes issues,
+    # it might need to be wrapped in a try-except ImportError at the top of the file.
+    # For this test, we assume `Trading` at the global scope can be reassigned here.
+
+    _OriginalTrading = Trading # Keep a reference (optional)
+    Trading = MockTrading     # Reassign Trading to MockTrading for this test run
+
+    print("Creating task (t1) for stop test...")
+    task_config_obj_t1 = MockConfig(currency="BTC/USD", delay=0.2)
+    t1 = Task(task_config_obj_t1)
+    print(f"Task ID (t1): {t1.task_id}, Initial Status: {t1.get_status()}")
+
+    print("Starting task (t1)...")
+    t1.start()
+    time.sleep(0.5) # Give time for task to start and send initial status
+    print(f"Task ID (t1): {t1.task_id}, Status after start: {t1.get_status()}")
+
+    print("Simulating run for t1 for a short period...")
+    time.sleep(0.3) # Let it run for 1-2 iterations (0.2s delay * 1-2 = 0.2-0.4s). Adjusted for better stop test.
+    print(f"Task ID (t1): {t1.task_id}, Status before stop: {t1.get_status()}")
+    print(f"Results from t1 before stop: {t1.get_results()}")
 
 
-    print("Simulating run for a few seconds (Task is mock, won't do real trading)...")
-    # The mock Trading class in this example doesn't have a long run loop by default
-    # The original Trading class would run until data ends or stopped.
-    # We're relying on the refactored Trading class's behavior.
-    # For this test, the mock trading loop inside original task.py was 10s.
-    # The refactored Trading class might finish quickly if not configured for long run.
-    # Let's assume it runs for a bit or finishes.
-
-    # Wait for the task to potentially finish or run for a bit
-    for i in range(5): # Check status over 5 seconds
-        s = t.get_status()
-        r = t.get_results()
-        print(f"After {i+1}s: Task ID: {t.task_id}, Status: {s}, Results: {r}")
-        if s not in ["running", "starting"]:
-            break
-        multiprocessing.Event().wait(1)
+    print("Stopping task (t1)...")
+    stop_success_t1 = t1.stop()
+    print(f"Stop attempted for t1: {stop_success_t1}")
+    time.sleep(0.5) # Give time for stop to be processed
+    print(f"Task ID (t1): {t1.task_id}, Status after stop: {t1.get_status()}")
+    print(f"Results from t1 after stop: {t1.get_results()}")
 
 
-    print("Stopping task (if it's still running)...")
-    stopped = t.stop()
-    print(f"Stop attempted: {stopped}. Task ID: {t.task_id}, Status: {t.get_status()}")
+    print("\nCreating task (t2) for completion test...")
+    task_config_obj_t2 = MockConfig(currency="ETH/USD", delay=0.2)
+    t2 = Task(task_config_obj_t2)
+    print(f"Task ID (t2): {t2.task_id}, Initial Status: {t2.get_status()}")
 
-    print("Final results...")
-    print(f"Results: {t.get_results()}")
-    print(f"Task ID: {t.task_id}, Final Status: {t.get_status()}")
-
-
-    print("\nTrying to start a new task to see if it completes (mock behavior)...")
-    task_config_obj2 = MockConfig(currency="ETH/USD", delay=1)
-    t2 = Task(task_config_obj2)
+    print("Starting task (t2)...")
     t2.start()
-    print(f"Task ID: {t2.task_id}, Status: {t2.get_status()}")
+    time.sleep(0.1) # Give a moment to start
+    print(f"Task ID (t2): {t2.task_id}, Status after start: {t2.get_status()}")
 
-    # Wait for t2 to complete or run for its duration
-    # The internal loop of refactored Trading depends on data or stop signal.
-    # This test depends on how quickly the (simulated) data source in Trading would exhaust.
-    # For this example, let's assume it might run for up to its internal loop (e.g. 10s if that was kept)
-    # or until the simulation data ends.
-    for i in range(12): # Max wait for 12 seconds
+    print("Waiting for task (t2) to complete (approx 1 second)...")
+    # MockTrading runs 5 iterations * 0.2s/iteration = 1 second.
+    # Add buffer for processing.
+    for i in range(15): # Check every 0.1s for 1.5s
         status_t2 = t2.get_status()
-        results_t2 = t2.get_results() # Get results to clear queue for next status update
-        print(f"Task ID: {t2.task_id}, Status: {status_t2}, Results: {results_t2}")
         if status_t2 not in ["running", "starting"]:
+            print(f"Task (t2) reached terminal status: {status_t2} at iteration {i}")
             break
-        multiprocessing.Event().wait(1)
+        time.sleep(0.1)
+    else:
+        print("Task (t2) did not reach terminal status in expected time.")
 
-    print(f"Task {t2.task_id} final status: {t2.get_status()}")
-    print(f"Task {t2.task_id} final results: {t2.get_results()}") # Get any last results
+    print(f"Task ID (t2): {t2.task_id}, Final Status: {t2.get_status()}")
+    print(f"Results from t2: {t2.get_results()}")
 
-    print("\nAll tasks done (example finished).")
+    print("\nAll tests done.")
