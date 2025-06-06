@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install .
-          pip install nose
+          # Install the project in editable mode with test dependencies
+          pip install -e .[test]
       - name: Run tests
         run: |
-          python -m unittest discover
+          pytest code/tests
