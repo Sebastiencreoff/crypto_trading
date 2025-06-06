@@ -1,0 +1,31 @@
+# infra/Dockerfile.trading_task
+# Base image
+FROM python:3.9-slim-buster
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies (if any beyond what's in slim-buster, similar to Dockerfile.app)
+# RUN apt-get update && apt-get install -y --no-install-recommends #     build-essential #     python3-dev #     libpq-dev #  && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first to leverage Docker layer caching
+# Assuming requirements.txt is the primary source of dependencies for the trading tasks
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+# Copy all of code/ as the Trading class might have dependencies within it (e.g. database, utils)
+COPY code/ /app/code/
+# Copy configuration files that might be needed by the task runner or underlying modules
+COPY config/ /app/config/
+
+# The trading task itself will be invoked by run_task_in_container.py
+# This script will parse TASK_CONFIG_JSON and run the Trading instance.
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Entrypoint script that will run the trading task
+COPY code/crypto_trading/run_task_in_container.py /app/code/crypto_trading/run_task_in_container.py
+ENTRYPOINT ["python", "/app/code/crypto_trading/run_task_in_container.py"]
+
+# Default command can be empty as configuration is passed via ENV
+CMD []

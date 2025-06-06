@@ -63,7 +63,7 @@ class Trading:
                  session, # SQLAlchemy session
                  task_id: str,
                  stop_event: threading.Event,
-                 results_queue: queue.Queue):
+                 results_queue: Optional[queue.Queue] = None):
 
         self.app_config = app_config
         self.exchange_config = exchange_config
@@ -97,7 +97,11 @@ class Trading:
             error_msg = f"Task {self.task_id}: Unknown exchange type: {self.exchange_config.name}"
             self.logger.error(error_msg)
             self._notify_sync(f"ERROR: {error_msg}") # Send notification on critical init error
-            self.results_queue.put({"status": "error", "message": error_msg, "task_id": self.task_id})
+            log_payload = {"status": "error", "message": error_msg, "task_id": self.task_id}
+            if self.results_queue:
+                self.results_queue.put(log_payload)
+            else:
+                self.logger.error(f"Task Event: Status='{log_payload['status']}', Message='{log_payload['message']}'")
             raise ValueError(error_msg)
 
         mock_algo_conf_for_main = {
@@ -125,7 +129,11 @@ class Trading:
 
         self.logger.info(f"Trading run loop starting for {currency}.")
         self._notify_sync(f"Task {self.task_id} for {currency} started.")
-        self.results_queue.put({"status": "info", "message": f"Task {self.task_id}: Started for {currency}", "task_id": self.task_id})
+        log_payload_start = {"status": "info", "message": f"Task {self.task_id}: Started for {currency}", "task_id": self.task_id}
+        if self.results_queue:
+            self.results_queue.put(log_payload_start)
+        else:
+            self.logger.info(f"Task Event: Status='{log_payload_start['status']}', Message='{log_payload_start['message']}'")
 
         prev_currency_value = None
         current_transaction = db_core_ops.get_open_transaction(
@@ -140,17 +148,29 @@ class Trading:
                     if currency_value is None and self.exchange_config.name == 'simulation':
                         self.logger.info(f"Simulation data source exhausted for {currency}.")
                         self._notify_sync(f"Task {self.task_id} for {currency}: Simulation ended.")
-                        self.results_queue.put({"status": "info", "message": "Simulation ended.", "task_id": self.task_id})
+                        log_payload_sim_end = {"status": "info", "message": "Simulation ended.", "task_id": self.task_id}
+                        if self.results_queue:
+                            self.results_queue.put(log_payload_sim_end)
+                        else:
+                            self.logger.info(f"Task Event: Status='{log_payload_sim_end['status']}', Message='{log_payload_sim_end['message']}'")
                         break
                 except connection.EndOfProcess:
                     self.logger.info(f"EndOfProcess signal received for {currency}.")
                     self._notify_sync(f"Task {self.task_id} for {currency}: EndOfProcess signal received.")
-                    self.results_queue.put({"status": "info", "message": "EndOfProcess.", "task_id": self.task_id})
+                    log_payload_eop = {"status": "info", "message": "EndOfProcess.", "task_id": self.task_id}
+                    if self.results_queue:
+                        self.results_queue.put(log_payload_eop)
+                    else:
+                        self.logger.info(f"Task Event: Status='{log_payload_eop['status']}', Message='{log_payload_eop['message']}'")
                     break
                 except Exception as e:
                     self.logger.error(f"Error getting currency value: {e}", exc_info=True)
                     self._notify_sync(f"Task {self.task_id} for {currency}: CRITICAL ERROR getting currency value: {e}")
-                    self.results_queue.put({"status": "error", "message": f"Error getting value: {e}", "task_id": self.task_id})
+                    log_payload_err_val = {"status": "error", "message": f"Error getting value: {e}", "task_id": self.task_id}
+                    if self.results_queue:
+                        self.results_queue.put(log_payload_err_val)
+                    else:
+                        self.logger.error(f"Task Event: Status='{log_payload_err_val['status']}', Message='{log_payload_err_val['message']}'", exc_info=True)
                     time.sleep(delay_seconds) # Consider a backoff strategy for repeated errors
                     continue
 
@@ -192,7 +212,11 @@ class Trading:
                                 success_msg = f"Sold {current_transaction.base_currency_bought_amount:.6f} of {currency} at {sell_price:.2f}. Profit: {profit:.2f} EUR. TxID: {current_transaction.id}"
                                 self.logger.info(success_msg)
                                 self._notify_sync(f"Task {self.task_id}: {success_msg}")
-                                self.results_queue.put({"status": "sold", "message": success_msg, "task_id": self.task_id})
+                                log_payload_sold = {"status": "sold", "message": success_msg, "task_id": self.task_id}
+                                if self.results_queue:
+                                    self.results_queue.put(log_payload_sold)
+                                else:
+                                    self.logger.info(f"Task Event: Status='{log_payload_sold['status']}', Message='{log_payload_sold['message']}'")
                                 current_transaction = None
                             except Exception as e:
                                 self.session.rollback()
@@ -221,7 +245,11 @@ class Trading:
                                 success_msg = f"Bought {amount_of_crypto_bought:.6f} of {currency} at {price_per_crypto:.2f}. TxID: {current_transaction.id}"
                                 self.logger.info(success_msg)
                                 self._notify_sync(f"Task {self.task_id}: {success_msg}")
-                                self.results_queue.put({"status": "bought", "message": success_msg, "task_id": self.task_id})
+                                log_payload_bought = {"status": "bought", "message": success_msg, "task_id": self.task_id}
+                                if self.results_queue:
+                                    self.results_queue.put(log_payload_bought)
+                                else:
+                                    self.logger.info(f"Task Event: Status='{log_payload_bought['status']}', Message='{log_payload_bought['message']}'")
                             except Exception as e:
                                 self.session.rollback()
                                 error_msg = f"Error during buy operation: {e}"
@@ -239,12 +267,20 @@ class Trading:
 
             if current_transaction and current_transaction.buy_date_time and not current_transaction.sell_date_time:
                 self.logger.info(f"Loop ended with an active open trade for {currency}. Tx ID: {current_transaction.id}")
-                self.results_queue.put({"status": "info", "message": "Ended with active trade.", "task_id": self.task_id})
+                log_payload_active_trade = {"status": "info", "message": "Ended with active trade.", "task_id": self.task_id}
+                if self.results_queue:
+                    self.results_queue.put(log_payload_active_trade)
+                else:
+                    self.logger.info(f"Task Event: Status='{log_payload_active_trade['status']}', Message='{log_payload_active_trade['message']}'")
 
         except Exception as e:
             self.logger.error(f"Unhandled exception in run loop for {currency}: {e}", exc_info=True)
             self._notify_sync(f"Task {self.task_id} for {currency}: CRITICAL unhandled exception in run loop: {e}")
-            self.results_queue.put({"status": "error", "message": f"Failed with error: {e}", "task_id": self.task_id})
+            log_payload_unhandled_err = {"status": "error", "message": f"Failed with error: {e}", "task_id": self.task_id}
+            if self.results_queue:
+                self.results_queue.put(log_payload_unhandled_err)
+            else:
+                self.logger.error(f"Task Event: Status='{log_payload_unhandled_err['status']}', Message='{log_payload_unhandled_err['message']}'", exc_info=True)
             try:
                 self.session.rollback()
             except Exception as rb_e:
@@ -252,12 +288,20 @@ class Trading:
         finally:
             self.logger.info(f"Trading run loop for {currency} stopped.")
             self._notify_sync(f"Task {self.task_id} for {currency} stopped.")
-            self.results_queue.put({"status": "stopped", "message": "Stopped.", "task_id": self.task_id})
+            log_payload_stopped = {"status": "stopped", "message": "Stopped.", "task_id": self.task_id}
+            if self.results_queue:
+                self.results_queue.put(log_payload_stopped)
+            else:
+                self.logger.info(f"Task Event: Status='{log_payload_stopped['status']}', Message='{log_payload_stopped['message']}'")
 
     def stop(self):
         self.logger.info(f"Stop method called. Setting stop_event.")
         self.stop_event.set()
-        self.results_queue.put({"status": "stopping", "message": "Stop signal sent.", "task_id": self.task_id})
+        log_payload = {"status": "stopping", "message": "Stop signal sent.", "task_id": self.task_id}
+        if self.results_queue:
+            self.results_queue.put(log_payload)
+        else:
+            self.logger.info(f"Task Event: Status='{log_payload['status']}', Message='{log_payload['message']}'")
 
     def profits(self):
         if not self.session:
@@ -276,11 +320,19 @@ class Trading:
         try:
             db_core_ops.reset_trading_transactions(self.session, currency_pair=currency, task_id=self.task_id)
             self.algo_if.reset(self.session, currency=currency)
-            self.results_queue.put({"status": "info", "message": "Trading state reset.", "task_id": self.task_id})
+            log_payload_reset_ok = {"status": "info", "message": "Trading state reset.", "task_id": self.task_id}
+            if self.results_queue:
+                self.results_queue.put(log_payload_reset_ok)
+            else:
+                self.logger.info(f"Task Event: Status='{log_payload_reset_ok['status']}', Message='{log_payload_reset_ok['message']}'")
             self.logger.info(f"Trading state reset complete for {currency}.")
             self._notify_sync(f"Task {self.task_id} for {currency}: Trading state has been reset.")
         except Exception as e:
             self.session.rollback()
             self.logger.error(f"Error resetting trading state: {e}", exc_info=True)
             self._notify_sync(f"Task {self.task_id} for {currency}: ERROR resetting trading state: {e}")
-            self.results_queue.put({"status": "error", "message": "Error resetting state.", "task_id": self.task_id})
+            log_payload_reset_err = {"status": "error", "message": "Error resetting state.", "task_id": self.task_id}
+            if self.results_queue:
+                self.results_queue.put(log_payload_reset_err)
+            else:
+                self.logger.error(f"Task Event: Status='{log_payload_reset_err['status']}', Message='{log_payload_reset_err['message']}'", exc_info=True)

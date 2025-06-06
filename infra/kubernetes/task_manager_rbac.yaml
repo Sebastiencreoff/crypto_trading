@@ -1,0 +1,39 @@
+# infra/kubernetes/task_manager_rbac.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trading-task-manager-sa
+  namespace: default # Or your target namespace
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default # Or your target namespace
+  name: trading-task-manager-role
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "delete", "get", "list", "watch", "patch"] # "patch" might be optional
+- apiGroups: [""] # Core API group
+  resources: ["pods"]
+  verbs: ["list", "get", "watch"] # "get" and "watch" might be more than list for some scenarios but list is key for finding job's pods
+- apiGroups: [""] # Core API group
+  resources: ["pods/log"]
+  verbs: ["get", "list"] # "list" for logs might not be common, "get" is primary
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trading-task-manager-rb
+  namespace: default # Or your target namespace
+subjects:
+- kind: ServiceAccount
+  name: trading-task-manager-sa # Name of the ServiceAccount
+  namespace: default # Namespace of the ServiceAccount
+roleRef:
+  kind: Role # Can be Role or ClusterRole
+  name: trading-task-manager-role # Name of the Role
+  apiGroup: rbac.authorization.k8s.io
