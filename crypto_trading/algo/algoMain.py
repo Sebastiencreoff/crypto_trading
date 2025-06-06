@@ -9,6 +9,7 @@ from . import average # Required for isinstance check
 from . import bollinger # Required for isinstance check
 from . import moving_average_crossover # Required for isinstance check
 from .ai_algo import AIAlgo
+from crypto_trading.database.core_operations import save_price_tick
 
 
 class AlgoMain:
@@ -51,7 +52,6 @@ class AlgoMain:
                     self.max_frequencies = max(valid_freqs)
             except AttributeError as e: # Should be more specific or check hasattr more carefully
                 logging.warning(f"An algorithm without max_frequencies method might be present or max_frequencies returned None: {e}")
-        model.create()
 
     def process(self, db_conn, current_value, currency): # Added db_conn
         """Process data, it returned 1 to buy and -1 to sell."""
@@ -65,15 +65,18 @@ class AlgoMain:
         #                       connection=db_conn) # Assuming Pricing is SQLObject and needs connection
         # The above line is removed as model.save_price in trading.py already handles this.
         # This process method is for calculating signals, not saving the current price tick again.
+        # Save the current price tick using the SQLAlchemy operation
+        save_price_tick(session=db_conn, currency_pair=currency, price=current_value)
 
         values = []
         if self.max_frequencies > 0:
             # model.pricing.get_last_values needs db_conn if it queries DB.
             # This implies model.pricing needs refactoring.
             values = model.pricing.get_last_values(
-                db_conn, # Pass db_conn
-                count=self.max_frequencies,
-                currency=currency)
+                session=db_conn, # Pass session object
+                currency_pair=currency,
+                count=self.max_frequencies
+            )
         else:
             logging.warning("max_frequencies is 0, not fetching historical values for algo processing.")
 
@@ -104,7 +107,7 @@ class AlgoMain:
 
     def reset(self, db_conn, currency): # Added db_conn and currency
         logging.info(f"AlgoMain: Resetting model data for currency {currency}.")
-        model.reset(db_conn, currency) # Pass db_conn and currency
+        model.pricing.reset(session=db_conn, currency_pair=currency) # Pass db_conn and currency
         # Optionally, reset internal states of sub-algorithms if they have reset methods
         for algo_instance in self.algo_ifs:
             if hasattr(algo_instance, 'reset'):

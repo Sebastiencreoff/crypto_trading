@@ -1,72 +1,55 @@
 import datetime
 import logging
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from crypto_trading.database.models import PriceTick
 
-import sqlobject
 
-
-def get_values(db_conn, currency, start_date_time, stop_date_time): # Added db_conn
+def get_values(session: Session, currency_pair: str, start_date_time: datetime.datetime, stop_date_time: datetime.datetime):
     """Get values."""
-    logging.debug(f"Fetching prices for {currency} between {start_date_time} and {stop_date_time}")
+    logging.debug(f"Fetching prices for {currency_pair} between {start_date_time} and {stop_date_time}")
     try:
-        return Pricing.select(
-            sqlobject.AND(
-                Pricing.q.currency == currency,
-                Pricing.q.date_time.between(start_date_time, stop_date_time)
-            ),
-            connection=db_conn # Use db_conn
-        )
+        return session.query(PriceTick).filter(
+            and_(
+                PriceTick.currency_pair == currency_pair,
+                PriceTick.timestamp.between(start_date_time, stop_date_time)
+            )
+        ).order_by(PriceTick.timestamp).all()
     except Exception as e:
-        logging.error(f"Error fetching values for {currency}: {e}", exc_info=True)
+        logging.error(f"Error fetching values for {currency_pair}: {e}", exc_info=True)
         return []
 
 
-def get_last_values(db_conn, currency, count=None): # Added db_conn
+def get_last_values(session: Session, currency_pair: str, count: int = None):
     """Get last values."""
-    logging.debug(f'Fetching last {count if count else "all"} prices for {currency}')
+    logging.debug(f'Fetching last {count if count else "all"} prices for {currency_pair}')
     try:
-        pricing_query = Pricing.select(
-            Pricing.q.currency == currency,
-            connection=db_conn # Use db_conn
-        ).orderBy(Pricing.q.date_time)
+        query = session.query(PriceTick.price).filter(
+            PriceTick.currency_pair == currency_pair
+        ).order_by(PriceTick.timestamp.desc())
 
         if count:
-            # Ensure count is positive integer if specified
             if not isinstance(count, int) or count <= 0:
-                logging.warning(f"Invalid count '{count}' for get_last_values, fetching all for {currency}.")
-                pass # Fetch all if count is invalid
+                logging.warning(f"Invalid count '{count}' for get_last_values, fetching all for {currency_pair}.")
             else:
-                pricing_query = pricing_query[-count:]
+                query = query.limit(count)
 
-        values = [x.value for x in pricing_query]
-        logging.debug(f'Found {len(values)} price(s) for {currency}.')
-        return values
+        # Fetch price values and reverse to maintain ascending order of time
+        price_values = [result[0] for result in query.all()]
+        return price_values[::-1]
     except Exception as e:
-        logging.error(f"Error fetching last values for {currency}: {e}", exc_info=True)
+        logging.error(f"Error fetching last values for {currency_pair}: {e}", exc_info=True)
         return []
 
 
-def reset(db_conn, currency): # Changed self to db_conn, added currency argument
+def reset(session: Session, currency_pair: str):
     """Reset pricing database for a given currency."""
-    logging.info(f'Resetting pricing data for currency: {currency}')
+    logging.info(f'Resetting pricing data for currency: {currency_pair}')
     try:
-        Pricing.deleteMany(Pricing.q.currency == currency, connection=db_conn) # Use db_conn
-        logging.info(f'Successfully reset pricing data for {currency}.')
+        num_deleted = session.query(PriceTick).filter(PriceTick.currency_pair == currency_pair).delete(synchronize_session=False)
+        # session.commit() # Important: Commit should be handled by the caller of this function
+        logging.info(f'Successfully deleted {num_deleted} PriceTick entries for {currency_pair}.')
     except Exception as e:
-        logging.error(f"Error resetting pricing data for {currency}: {e}", exc_info=True)
-
-
-class Pricing(sqlobject.SQLObject):
-    """Db used to store data."""
-
-    DATE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
-
-    date_time = sqlobject.col.DateTimeCol(
-        default=sqlobject.col.DateTimeCol.now())
-    value = sqlobject.col.FloatCol(default=None)
-    currency = sqlobject.col.StringCol()
-
-    # Optional: Add index for faster queries
-    # class sqlmeta:
-    #     indices = [
-    #         sqlobject.dbIndex('currency', 'date_time'),
-    #     ]
+        # session.rollback() # Rollback should be handled by the caller
+        logging.error(f"Error resetting PriceTick data for {currency_pair}: {e}", exc_info=True)
+        raise # Re-raise the exception to allow caller to handle transaction
