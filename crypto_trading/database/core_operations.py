@@ -128,3 +128,74 @@ def reset_trading_transactions(session: Session, currency_pair: str = None, task
 #     session.add(trade_to_sell) # Add to session if it was detached or to ensure it's marked dirty
 #     # session.commit() # Typically caller commits
 #     return trade_to_sell
+
+
+def get_portfolio_value_history_sqlalchemy(session: Session, initial_capital: float):
+    """
+    Calculates the portfolio value history based on closed trades using SQLAlchemy.
+
+    Args:
+        session: The SQLAlchemy session to use for database queries.
+        initial_capital: The initial capital to start the graph with.
+
+    Returns:
+        A list of (timestamp, portfolio_value) tuples.
+        The first point is (earliest_buy_time, initial_capital).
+        Subsequent points are (sell_time, initial_capital + cumulative_profit).
+        Returns a list with a single point (now, initial_capital) if no trades exist.
+    """
+    data_points = []
+    cumulative_profit = 0.0
+
+    # Find the earliest trade time for the initial data point
+    first_trade = session.query(TradingTransaction).order_by(TradingTransaction.buy_date_time).first()
+
+    start_time = datetime.datetime.utcnow()  # Default if no trades
+    if first_trade and first_trade.buy_date_time:
+        start_time = first_trade.buy_date_time
+
+    data_points.append((start_time, initial_capital))
+
+    # Query completed trades, ordered by sell_date_time
+    completed_trades = session.query(TradingTransaction).filter(
+        TradingTransaction.sell_date_time != None
+    ).order_by(TradingTransaction.sell_date_time).all()
+
+    for trade in completed_trades:
+        if trade.profit_eur is not None: # Assuming profit is stored in profit_eur
+            cumulative_profit += trade.profit_eur
+            if trade.sell_date_time: # Should always be true due to query condition
+                data_points.append((trade.sell_date_time, initial_capital + cumulative_profit))
+            else:
+                # This case should ideally not be reached if data integrity is maintained
+                logger.warning(f"Trade with ID {trade.id} marked complete but missing sell_date_time, skipping for graph.")
+
+    # If there were no completed trades, the list will only contain the initial point.
+    # If there were no trades at all, it will be (now, initial_capital)
+    # If there were trades, but none completed, it will be (first_trade_buy_time, initial_capital)
+    # This matches the behavior of the original function where if completed_trades is empty,
+    # it just returns the initial data_points list.
+
+    return data_points
+
+
+def get_completed_trades_sqlalchemy(session: Session) -> list[TradingTransaction]:
+    """
+    Retrieves all completed trades (those with a sell_date_time) ordered by sell_date_time.
+
+    Args:
+        session: The SQLAlchemy session to use for database queries.
+
+    Returns:
+        A list of TradingTransaction objects representing completed trades.
+    """
+    try:
+        completed_trades = session.query(TradingTransaction).filter(
+            TradingTransaction.sell_date_time != None
+        ).order_by(TradingTransaction.sell_date_time).all()
+        logger.debug(f"Retrieved {len(completed_trades)} completed trades.")
+        return completed_trades
+    except Exception as e:
+        logger.error(f"Error retrieving completed trades: {e}", exc_info=True)
+        # Depending on desired error handling, could return [] or re-raise
+        raise

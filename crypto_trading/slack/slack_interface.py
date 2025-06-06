@@ -10,7 +10,10 @@ from slack_sdk.errors import SlackApiError
 # pip install "slack_sdk[rtm]" or ensure it's in setup.py
 
 from crypto_trading.plotting import generate_portfolio_graph, generate_pnl_per_trade_graph
-from crypto_trading import model
+# Removed: from crypto_trading import model
+from crypto_trading.database import core_operations as db_ops
+from crypto_trading.database.models import TradingTransaction # For type hints if needed
+from crypto_trading.config import Config # For type hint for self.conf and clarity
 
 
 class SlackInterface:
@@ -22,13 +25,17 @@ class SlackInterface:
             conf: The application configuration object.
             trading_instance: An instance of the Trading class.
         """
-        self.conf = conf
+        self.conf: Config = conf # Added type hint for clarity
         self.trading_instance = trading_instance
-        self.slack_token = getattr(self.conf, 'slack_token', None)
-        self.channel_id = getattr(self.conf, 'slack_channel_id', None)
+        # Assuming conf object correctly provides these attributes from config file
+        # (e.g. self.conf.slack_token, self.conf.slack_channel_id)
+        # Based on config.py, these are loaded into self.config_data and then accessed.
+        # Let's assume they are direct attributes on Config object or use self.conf.config_data.get
+        self.slack_token = self.conf.config_data.get('slack_token')
+        self.channel_id = self.conf.config_data.get('slack_channel_id')
 
         if not self.slack_token or not self.channel_id:
-            logging.error("Slack token or channel ID is not configured. SlackInterface will be disabled.")
+            logging.error("Slack token or channel ID is not configured (loaded as None). SlackInterface will be disabled.")
             self.client = None
             self.rtm_client = None
             return
@@ -145,9 +152,13 @@ class SlackInterface:
         elif command.startswith("graph"):
             logging.info(f"Graph command received from user {user_id} in channel {channel}.")
             temp_file_path = None
+            logging.info(f"Graph command received from user {user_id} in channel {channel}.")
+            temp_file_path = None
+            session = None
             try:
-                initial_capital = self.conf.initial_capital
-                data_points = model.get_portfolio_value_history(initial_capital)
+                initial_capital = self.conf.initial_capital # This should be correctly loaded by Config
+                session = self.conf.get_session()
+                data_points = db_ops.get_portfolio_value_history_sqlalchemy(session, initial_capital)
 
                 if not data_points or len(data_points) < 2:
                     self.send_message("Not enough data to generate a graph yet.")
@@ -177,6 +188,8 @@ class SlackInterface:
                 logging.error(f"Unexpected error during graph command: {e}", exc_info=True)
                 self.send_message("Sorry, an unexpected error occurred while processing the graph command.")
             finally:
+                if session:
+                    session.close()
                 if temp_file_path and os.path.exists(temp_file_path):
                     try:
                         os.remove(temp_file_path)
@@ -187,11 +200,10 @@ class SlackInterface:
         elif command.startswith("pnl_chart"):
             logging.info(f"P/L Chart command received from user {user_id} in channel {channel}.")
             temp_file_path = None
+            session = None
             try:
-                completed_trades = list(model.Trading.select(
-                    model.Trading.q.sell_date_time != None,
-                    orderBy=model.Trading.q.sell_date_time
-                ))
+                session = self.conf.get_session()
+                completed_trades: list[TradingTransaction] = db_ops.get_completed_trades_sqlalchemy(session)
 
                 if not completed_trades:
                     self.send_message("No completed trades found to generate a P/L chart.")
@@ -202,7 +214,7 @@ class SlackInterface:
                     trade_label = trade.sell_date_time.strftime('%Y-%m-%d %H:%M') if trade.sell_date_time else f"Trade {i+1}"
                     trades_data_for_plot.append({
                         'label': trade_label,
-                        'profit': trade.profit if trade.profit is not None else 0.0
+                        'profit': trade.profit_eur if trade.profit_eur is not None else 0.0 # Changed to profit_eur
                     })
 
                 if not trades_data_for_plot: # Should not happen if completed_trades is not empty, but as a safeguard
@@ -233,6 +245,8 @@ class SlackInterface:
                 logging.error(f"Unexpected error during P/L chart command: {e}", exc_info=True)
                 self.send_message("Sorry, an unexpected error occurred while processing the P/L chart command.")
             finally:
+                if session:
+                    session.close()
                 if temp_file_path and os.path.exists(temp_file_path):
                     try:
                         os.remove(temp_file_path)

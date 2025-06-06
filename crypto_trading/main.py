@@ -9,7 +9,7 @@ import threading
 
 import crypto_trading.config
 import crypto_trading.trading
-from .slack_interface import SlackInterface
+from .slack.slack_interface import SlackInterface # Updated import path
 
 
 def main():
