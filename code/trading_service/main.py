@@ -15,6 +15,8 @@ from crypto_trading.task_manager import TaskManager # New import
 
 from .models import CreateTaskRequest, TaskStatusResponse, TaskCreateResponse, TaskStopResponse, TaskProfitResponse, TaskResetResponse # Removed TaskInfo
 
+import os # Added for environment variable access
+
 # --- Globals / App State ---
 task_manager_instance: Optional[TaskManager] = None
 app_config: Optional[AppConfig] = None # Loaded config
@@ -29,15 +31,20 @@ async def lifespan(app: FastAPI):
     global app_config, task_manager_instance
     logger.info("FastAPI application starting up...")
     # Load configuration
-    config_file_path = "config/central_config.json"
+    config_file_path = os.environ.get("APP_CONFIG_FILE_PATH")
+    if not config_file_path:
+        logger.error("APP_CONFIG_FILE_PATH environment variable not set.")
+        raise RuntimeError("APP_CONFIG_FILE_PATH environment variable not set.")
+    logger.info(f"Loading configuration from: {config_file_path}")
+
     try:
         init_global_config(config_file_path)
-        app_config = global_app_config
-        logger.info(f"Configuration loaded successfully for service: {app_config.service_name}")
+        app_config = global_app_config # global_app_config is set by init_global_config
 
-        if not app_config:
-             logger.error("Failed to load application configuration during startup.")
+        if not app_config: # Check if global_app_config got populated
+             logger.error("Failed to load application configuration during startup (app_config is None).")
              raise RuntimeError("Failed to load application configuration.")
+        logger.info(f"Configuration loaded successfully for service: {app_config.service_name}")
 
         # Initialize TaskManager
         task_manager_instance = TaskManager()

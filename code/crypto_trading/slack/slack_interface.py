@@ -10,24 +10,19 @@ logger = logging.getLogger(__name__)
 
 class SlackCommandHandler:
     def __init__(self, conf, task_manager): # conf is expected to be SlackConfig instance
-        self.conf = conf
+        self.conf = conf # Expected to be an instance of SlackConfig (or similar)
         self.task_manager = task_manager
         self._initialized_successfully = False
         self._keep_running = True # For graceful shutdown
 
-        bot_token = None
-        if hasattr(conf, 'bot_token') and conf.bot_token:
-            bot_token = conf.bot_token
-            logger.info("Using bot_token from configuration object.")
+        bot_token = os.environ.get("SLACK_BOT_TOKEN")
+        if not bot_token:
+            logger.error("SLACK_BOT_TOKEN environment variable not set. SlackCommandHandler cannot initialize.")
+            self.client = None
+            self.rtm_client = None
+            return # Cannot initialize further
         else:
-            bot_token = os.environ.get("SLACK_BOT_TOKEN")
-            if bot_token:
-                logger.info("Using bot_token from SLACK_BOT_TOKEN environment variable.")
-            else:
-                logger.error("Slack bot token not found in config or environment variable SLACK_BOT_TOKEN.")
-                self.client = None
-                self.rtm_client = None
-                return # Cannot initialize further
+            logger.info("Using bot_token from SLACK_BOT_TOKEN environment variable.")
 
         try:
             self.client = WebClient(token=bot_token)

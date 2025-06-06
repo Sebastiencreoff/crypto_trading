@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 from slack_sdk import WebClient
@@ -13,33 +14,27 @@ class SlackNotifier:
     def __init__(self, slack_config: SlackConfig):
         """
         Initializes the SlackNotifier.
+        The bot token is sourced from the SLACK_BOT_TOKEN environment variable.
+        The default channel ID is sourced from the provided slack_config object.
 
         Args:
-            slack_config: A SlackConfig object containing the bot_token and default_channel.
-                          Note: The provided SlackConfig schema has webhook_url and channel.
-                          This class expects bot_token and default_channel_id for WebClient.
-                          The schema might need adjustment, or we adapt here if webhook_url is to be used.
-                          For now, assuming slack_config will have 'bot_token' and 'default_channel_id' attributes
-                          perhaps through 'extra_settings' or a revised SlackConfig model.
+            slack_config: A SlackConfig object containing the default_channel_id.
         """
         self.config = slack_config
+        self.client = None
+        self.bot_id = None
 
-        # Adapting to use bot_token from SlackConfig.
-        # The current SlackConfig from config_management.schemas has:
-        # class SlackConfig(BaseModel):
-        #   webhook_url: HttpUrl
-        #   channel: str
-        # This is not directly compatible with WebClient token-based auth.
-        # SlackConfig schema is now expected to have bot_token and default_channel_id.
+        bot_token = os.environ.get("SLACK_BOT_TOKEN")
+        if not bot_token:
+            logger.error("SLACK_BOT_TOKEN environment variable not set. SlackNotifier will be disabled.")
+            return
 
-        if not self.config.bot_token or not self.config.default_channel_id:
-            logger.error("Slack bot_token or default_channel_id is not configured in SlackConfig. SlackNotifier will be disabled.")
-            self.client = None
-            self.bot_id = None
+        if not self.config or not self.config.default_channel_id:
+            logger.error("SlackConfig with default_channel_id is not properly configured. SlackNotifier will be disabled.")
             return
 
         try:
-            self.client = WebClient(token=self.config.bot_token)
+            self.client = WebClient(token=bot_token)
             auth_test = self.client.auth_test()
             if not auth_test["ok"]:
                 logger.error(f"Slack WebClient auth_test failed: {auth_test.get('error', 'Unknown error')}. SlackNotifier disabled.")
