@@ -67,13 +67,13 @@ def get_db_url_from_central_config():
             db_path = os.path.abspath(db_path)
             return f"sqlite:///{db_path}"
         # Add other database types here if needed (e.g., postgresql)
-        # elif db_type == 'postgresql':
-        #     user = db_config.get('username')
-        #     password = db_config.get('password')
-        #     host = db_config.get('host')
-        #     port = db_config.get('port')
-        #     dbname = db_config.get('name')
-        #     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+        elif db_type == 'postgresql':
+            user = db_config.get('username')
+            password = db_config.get('password')
+            host = db_config.get('host')
+            port = db_config.get('port')
+            dbname = db_config.get('name')
+            return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
         else:
             raise ValueError(f"Unsupported database type: {db_type} in central_config.json")
 

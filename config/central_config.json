@@ -1,12 +1,12 @@
 {
     "service_name": "crypto_trader_main",
     "database": {
-        "type": "sqlite",
-        "host": "",
-        "port": 0,
-        "username": "",
-        "password": "",
-        "name": "./BINANCE_TRADES.db"
+        "type": "postgresql",
+        "host": "YOUR_POSTGRESQL_HOST",
+        "port": 5432,
+        "username": "YOUR_POSTGRESQL_USERNAME",
+        "password": "YOUR_POSTGRESQL_PASSWORD",
+        "name": "YOUR_POSTGRESQL_DBNAME"
     },
     "exchanges": [
         {
