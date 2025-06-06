@@ -13,3 +13,5 @@ pytest
 pytest-cov
 pytest-asyncio
 respx # For mocking HTTP requests (alternative: pytest-httpx)
+
+kubernetes
