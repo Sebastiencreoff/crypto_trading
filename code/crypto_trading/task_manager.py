@@ -37,19 +37,30 @@ class TaskManager:
     def create_task(self, config_obj):
         task_id = uuid.uuid4()
         task_id_str = str(task_id)
+        # Log the expectation for config_obj structure
+        logging.info(f"Expecting config_obj for task {task_id_str} to be pre-structured with app_settings, exchange_settings, algo_settings, task_parameters.")
         job_name = self._generate_job_name(task_id_str)
 
         if not isinstance(config_obj, dict):
-            logging.error("config_obj must be a dictionary.")
+            logging.error("config_obj must be a dictionary containing app_settings, exchange_settings, algo_settings, task_parameters.")
             return None
 
-        container_config = config_obj.copy()
-        container_config["task_id"] = task_id_str
+        # Ensure all expected top-level keys are present in config_obj
+        # This helps validate the incoming structure expected by run_task_in_container.py
+        expected_keys = ["app_settings", "exchange_settings", "algo_settings", "task_parameters"]
+        missing_keys = [key for key in expected_keys if key not in config_obj]
+        if missing_keys:
+            logging.error(f"Task {task_id_str}: config_obj is missing required top-level keys: {missing_keys}. It must provide these structures for the Pydantic models in the container.")
+            return None
+
+        container_config = config_obj.copy() # config_obj should already have the nested structure
+        container_config["task_id"] = task_id_str # Add task_id at the top level
 
         try:
+            # task_config_json will now contain the full structure including task_id
             task_config_json = json.dumps(container_config)
         except TypeError as e:
-            logging.error(f"Failed to serialize config_obj to JSON for task {task_id_str}: {e}")
+            logging.error(f"Failed to serialize the structured container_config to JSON for task {task_id_str}: {e}")
             return None
 
         container = client.V1Container(
@@ -310,22 +321,42 @@ if __name__ == '__main__':
         manager = TaskManager()
         main_logger.info("TaskManager initialized.")
 
-        # Example task configuration (ensure this matches what run_task_in_container.py expects)
+        # Example task configuration, structured for Pydantic models in run_task_in_container.py
         sample_config1 = {
-            "currency": "BTC/USD",
-            "exchange": "binance_simulation", # Assuming simulation mode for testing
-            "strategy": "moving_average_crossover",
-            "interval": "1m", # Use a short interval for faster completion in test
-            "transaction_amt": 10, # Small amount
-            "delay_secs": 5, # Short delay for the trading loop
-            "connection_type": "simulation",
-            "dir_path": "/app/config/sample_data/simu_data_btc_1m.csv", # Path inside the container
-            "algo_config": { "short_window": 2, "long_window": 4 }, # Simplified for quick test
-            "paper_trade": True, # Ensure it runs in paper trade mode
-            # Ensure task_id will be added by create_task
+            "app_settings": {
+                "notification_service_url": None, # Example: "http://notification-service-svc.default.svc.cluster.local:8000"
+                "base_config_path": "/app/config", # Path within the container for SimulationConnect
+                "database_url": None, # Let run_task_in_container use its default (e.g. from central_config.json)
+                "other_settings": {
+                    "delay_seconds": 5 # Original delay_secs, short for testing
+                }
+            },
+            "exchange_settings": {
+                "name": "simulation", # Was 'connection_type', 'binance_simulation' implied simulation
+                "api_key": None,      # Not needed for simulation
+                "secret_key": None,   # Not needed for simulation
+                "extra_settings": {   # For simulation-specific settings
+                    "dir_path": "/app/config/sample_data/simu_data_btc_1m.csv" # Original dir_path
+                },
+                "paper_trade": True   # Original paper_trade
+            },
+            "algo_settings": {
+                "name": "moving_average_crossover", # Original strategy
+                "parameters": { # Original algo_config became parameters
+                    "short_window": 2, # Simplified for quick test
+                    "long_window": 4   # Simplified for quick test
+                    # Other potential algo params like "maxLost", "takeProfit" could go here
+                }
+            },
+            "task_parameters": { # Task-specific operational parameters for the Trading class
+                "currency": "BTC/USD", # Original currency
+                "transaction_amount": 10, # Original transaction_amt
+                "interval": "1m" # Original interval
+            }
+            # task_id will be added by TaskManager.create_task to the root of this structure
         }
 
-        main_logger.info(f"\nAttempting to create task 1 with config: {sample_config1}")
+        main_logger.info(f"\nAttempting to create task 1 with structured config: {json.dumps(sample_config1, indent=2)}")
         task_id1 = manager.create_task(sample_config1)
 
         if task_id1:
