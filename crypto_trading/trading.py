@@ -15,6 +15,8 @@ from . import connection
 # Removed: from .connection import coinBase (No longer exists)
 from .connection import binance
 
+from crypto_trading.database.core_operations import get_total_profit # Added for profits() method
+
 # Removed: from . import model (SQLObject model)
 
 
@@ -215,10 +217,23 @@ class Trading:
 
     def is_running(self):
         """Check if the trading loop is running."""
-        return self.loop == 1
+        return self.loop == 1 # TODO: This should be updated to use stop_event
 
     def profits(self):
-        return model.get_profits()
+        # Assuming self.session is the SQLAlchemy session managed by the Trading instance
+        if not self.session:
+            self.logger.error("Database session is not available in Trading instance.")
+            return 0.0 # Or raise an error
+        try:
+            # Get global profits, similar to the old model.get_profits()
+            # This will retrieve total profit for all currency pairs / tasks if not filtered.
+            # If task-specific or currency-specific profit is needed, get_total_profit would need enhancement
+            # or a different function call. For now, it mirrors the old global behavior.
+            total_profits = get_total_profit(self.session)
+            return total_profits if total_profits is not None else 0.0
+        except Exception as e:
+            self.logger.error(f"Error retrieving total profits: {e}", exc_info=True)
+            return 0.0 # Or handle error as appropriate
 
     def reset_trading_state(self):
         """Resets trading state for the currency of this task using SQLAlchemy session."""

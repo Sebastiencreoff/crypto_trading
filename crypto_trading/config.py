@@ -28,11 +28,11 @@ class Config:
             if not os.path.isabs(db_file_name):
                 self.database_file = os.path.join(self.dir_path, db_file_name)
             # Slack integration settings (optional)
-            self.slack_token = self.config_dict.get('slack_token')
-            self.slack_channel_id = self.config_dict.get('slack_channel_id')
+            self.slack_token = self.config_data.get('slack_token')
+            self.slack_channel_id = self.config_data.get('slack_channel_id')
 
             # Initial capital for portfolio graphing (optional, defaults to 0.0)
-            self.initial_capital = float(self.config_dict.get('initial_capital', 0.0))
+            self.initial_capital = float(self.config_data.get('initial_capital', 0.0))
 
             # Database  name
             self.pricing = 'Pricing'
