@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto_trading"
+version = "0.0.1"
+description = "Crypto Trading project with CoinBase API"
+readme = "README.md"
+authors = [
+    { name = "Sebastien Creoff", email = "sebastien.creoff@gmail.com" },
+]
+license = "MIT"
+requires-python = ">=3.7" # Assuming a reasonable modern Python version, can be adjusted
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "setuptools",
+    "coinbase",
+    "numpy",
+    "pandas",
+    "requests",
+    "sqlobject",
+    "psycopg2-binary",
+    "boto3",
+    "slack_sdk[rtm]",
+    "matplotlib",
+]
+
+[project.urls]
+Homepage = "https://github.com/Sebastiencreoff/pythonTrading"
+
+[tool.setuptools]
+packages = ["crypto_trading"]
+
+[project.scripts]
+trading = "crypto_trading.main:main"
+
+[project.optional-dependencies]
+test = [
+    "nose",
+]
