@@ -61,36 +61,7 @@ def main():
     logger.name = f"run_task_in_container-{task_id_str}" # Update logger name with task_id
 
     # --- Database Connection ---
-    central_config_path = "/app/config/central_config.json" # Standard path from Dockerfile
-    db_uri = None
-    try:
-        # This assumes central_config.json is mainly for DB URI if not overridden by task specific config.
-        # However, the new Trading class expects AppConfig which might also have DB details.
-        # Let's prioritize DB URI from TASK_CONFIG_JSON if provided, else use central_config.
-
-        # Check if db_uri is part of task_config_dict (e.g. within app_settings or a dedicated db_settings key)
-        # For now, stick to the original logic of using central_config.json for DB URI.
-        # This might need refinement if DB config per task is desired via TASK_CONFIG_JSON.
-        if os.path.exists(central_config_path):
-            with open(central_config_path, 'r') as f:
-                central_config_data = json.load(f)
-                db_uri = central_config_data.get("database", {}).get("uri")
-                logger.info(f"Database URI found in {central_config_path}: {db_uri is not None}")
-        else:
-            logger.warning(f"Central config file {central_config_path} not found. DB URI must be in task config or will fail.")
-
-    except Exception as e:
-        logger.error(f"Could not load database URI from {central_config_path}: {e}")
-        # Continue, as DB URI might be implicitly part of AppConfig from TASK_CONFIG_JSON
-
-    if not db_uri and not task_config_dict.get("app_settings", {}).get("database_url"):
-         # If app_settings.database_url is also not present in task_config_dict
-        logger.error("Database URI not found in central configuration or task-specific app_settings.database_url.")
-        sys.exit(1)
-
-    # If db_uri was found in central_config, it will be used by init_db unless overridden by app_config_obj.database_url
-    # The init_db and get_db_session are called before AppConfig's potential override is known.
-    # This is a bit tricky. Let's assume AppConfig will contain the definitive DB URI if provided.
+    # Database URI will be sourced exclusively from TASK_CONFIG_JSON via app_settings.database_url
 
     db_session = None # Initialize to None
     engine_to_use = None
@@ -102,12 +73,7 @@ def main():
         algo_conf_data = task_config_dict.get("algo_settings", {})
         task_params_data = task_config_dict.get("task_parameters", {})
 
-        # If db_uri from central_config.json exists, and app_conf_data doesn't specify one, use it.
-        # Pydantic models will use their defaults if a field is not provided.
-        # If 'database_url' is a field in AppConfig, it will be used.
-        if db_uri and 'database_url' not in app_conf_data:
-             app_conf_data['database_url'] = db_uri # Inject centrally loaded DB URI if not in task's app_settings
-
+        # AppConfig is expected to contain database_url directly from TASK_CONFIG_JSON's app_settings
         app_config_obj = AppConfig(**app_conf_data)
         exchange_config_obj = ExchangeConfig(**exchange_conf_data)
         algo_config_obj = AlgoConfig(**algo_conf_data)
@@ -118,16 +84,17 @@ def main():
         logger.info(f"TaskParams for Trading: {task_params_data}")
 
         # Now establish DB connection using the definitive URI from AppConfig
-        definitive_db_uri = str(app_config_obj.database_url) if app_config_obj.database_url else db_uri
-        if not definitive_db_uri:
-            logger.error("Database URI is not defined in AppConfig or central_config.json.")
+        if not app_config_obj.database or not app_config_obj.database.database_url:
+            logger.error("Database URL is not defined in AppConfig from TASK_CONFIG_JSON.")
             sys.exit(1)
 
-        logger.info(f"Using database URI: {definitive_db_uri} for this task.")
+        definitive_db_uri = str(app_config_obj.database.database_url)
+
+        logger.info(f"Using database URI: {definitive_db_uri} for this task (from TASK_CONFIG_JSON).")
         engine_to_use = init_db(definitive_db_uri)
         SessionLocal = get_db_session(engine_to_use)
         db_session = SessionLocal()
-        logger.info("Database session created successfully using definitive URI.")
+        logger.info("Database session created successfully using URI from TASK_CONFIG_JSON.")
 
     except Exception as e:
         logger.error(f"Error creating Pydantic config objects or DB session: {e}", exc_info=True)

@@ -12,29 +12,14 @@ class CreateTaskRequest(BaseModel):
 class TaskStatusResponse(BaseModel):
     task_id: str
     status: str # e.g., "running", "stopped", "error", "initializing"
-    currency_pair: str
-    exchange_name: str
-    algo_name: str
+    currency_pair: Optional[str] = None
+    exchange_name: Optional[str] = None
+    algo_name: Optional[str] = None
     message: Optional[str] = None
-
-class TaskInfo(BaseModel): # For storing task details internally
-    task_id: str
-    currency_pair: str
-    exchange_name: str
-    algo_name: str
-    status: str = "initializing"
-    # Potentially store a reference to the trading thread/task and stop event
-    # thread: Optional[Any] = None # Cannot directly serialize thread object
-    # stop_event: Optional[Any] = None # Cannot directly serialize event object
-    # results_queue: Optional[Any] = None # Cannot directly serialize queue object
-
-    class Config:
-        arbitrary_types_allowed = True # To allow non-pydantic types if needed, though not for direct FastAPI response
 
 class TaskCreateResponse(BaseModel):
     task_id: str
     message: str
-    details: TaskStatusResponse
 
 class TaskStopResponse(BaseModel):
     task_id: str

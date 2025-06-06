@@ -8,8 +8,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Define a constant for the namespace, can be made configurable
 KUBE_NAMESPACE = "default"
+# TODO: Make TASK_DOCKER_IMAGE configurable for production environments.
 # Define a constant for the Docker image, should be configurable
-TASK_DOCKER_IMAGE = "your-docker-registry/trading-task:latest" # Placeholder
+TASK_DOCKER_IMAGE = "trading-task:latest" # Placeholder
 JOB_LABEL_SELECTOR = "app=crypto-trading-task,managed-by=task-manager"
 
 class TaskManager:
