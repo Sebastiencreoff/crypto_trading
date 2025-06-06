@@ -1,13 +1,29 @@
-from pydantic import BaseModel, FilePath, HttpUrl, DirectoryPath
+from pydantic import BaseModel, FilePath, HttpUrl, DirectoryPath, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict # For Pydantic v2 style env var loading
 from typing import Optional, Dict, List
 
+# Try to import SettingsConfigDict for Pydantic v2, fallback for v1
+try:
+    from pydantic_settings import SettingsConfigDict
+    IS_PYDANTIC_V2 = True
+except ImportError:
+    from pydantic import BaseConfig
+    IS_PYDANTIC_V2 = False
+
 class DatabaseConfig(BaseModel):
-    type: str
-    host: str
-    port: int
-    username: str
-    password: str
-    name: str
+    type: str = Field(default="postgresql")
+    host: str = Field(default="localhost")
+    port: int = Field(default=5432)
+    username: str = Field(default="user")
+    password: str = Field(default="password")
+    name: str = Field(default="mydb")
+
+    if IS_PYDANTIC_V2:
+        model_config = SettingsConfigDict(env_prefix='APP_DB_', extra='ignore')
+    else:
+        class Config(BaseConfig):
+            env_prefix = 'APP_DB_'
+            extra = 'ignore' # Allow other env vars not matching the fields
 
 class ExchangeConfig(BaseModel):
     name: str
@@ -40,3 +56,9 @@ class AppConfig(BaseModel):
     base_config_path: Optional[DirectoryPath] = None
     # URL for the notification service
     notification_service_url: Optional[HttpUrl] = None
+
+    if IS_PYDANTIC_V2:
+        model_config = SettingsConfigDict(extra='ignore')
+    else:
+        class Config(BaseConfig):
+            extra = 'ignore'
