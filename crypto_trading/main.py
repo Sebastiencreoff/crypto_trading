@@ -5,9 +5,11 @@ import argparse
 import logging
 import signal
 import sys
+import threading
 
 import crypto_trading.config
 import crypto_trading.trading
+from .slack_interface import SlackInterface
 
 
 def main():
@@ -31,6 +33,24 @@ def main():
     )
 
     trading = crypto_trading.trading.Trading(args.config)
+
+    # Initialize SlackInterface
+    # Note: This assumes that trading.conf will have 'slack_token' and 'slack_channel_id'
+    # These need to be added to the configuration file (e.g., trading_SIMU.json)
+    try:
+        slack_interface = SlackInterface(conf=trading.conf, trading_instance=trading)
+        # Start Slack listening in a separate thread
+        slack_thread = threading.Thread(target=slack_interface.start_listening, daemon=True)
+        slack_thread.start()
+    except AttributeError as e:
+        logging.error(f"Failed to initialize SlackInterface. Missing configuration? {e}")
+        # Depending on requirements, you might want to exit or continue without Slack.
+        # For now, we'll log the error and continue.
+        slack_interface = None # Ensure it's defined for potential later checks
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during SlackInterface initialization or thread starting: {e}")
+        slack_interface = None
+
 
     # Stopping properly.
     for stop in [signal.SIGTERM, signal.SIGQUIT, signal.SIGINT]:

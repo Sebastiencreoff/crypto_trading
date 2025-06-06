@@ -213,13 +213,12 @@ class Trading:
         self.stop_event.set()
         self.results_queue.put({"status": "stopping", "message": f"Task {self.task_id}: Stop signal sent for {self.conf.currency}."})
 
-    def get_profits(self):
-        """Calculates profits for the currency of this task using SQLAlchemy session."""
-        try:
-            return db_core_ops.get_total_profit(self.session, currency_pair=self.conf.currency, task_id=str(self.task_id))
-        except Exception as e:
-            self.logger.error(f"Task {self.task_id}: Error getting profits: {e}", exc_info=True)
-            return 0.0 # Return default on error
+    def is_running(self):
+        """Check if the trading loop is running."""
+        return self.loop == 1
+
+    def profits(self):
+        return model.get_profits()
 
     def reset_trading_state(self):
         """Resets trading state for the currency of this task using SQLAlchemy session."""

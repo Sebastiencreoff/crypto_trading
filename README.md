@@ -140,6 +140,64 @@ python main.py
 ```
 (Assuming `main.py` is the entry point).
 
+## Slack Integration
+
+The trading bot can be monitored and controlled via Slack messages.
+
+### Setup
+
+To enable Slack integration, you need to configure your Slack Bot User OAuth Token and the target Slack Channel ID in your JSON configuration file (e.g., `config/trading_SIMU.json` or `config/trading_COINBASE.json`).
+
+1.  **Create a Slack App and Bot User:**
+    *   Go to [api.slack.com/apps](https://api.slack.com/apps) and create a new app.
+    *   Add a "Bot User" to your app.
+    *   Under "OAuth & Permissions", find the "Bot User OAuth Token". It usually starts with `xoxb-`. This is your `slack_token`.
+    *   Ensure your bot token has the necessary permissions (scopes). Required scopes typically include:
+        *   `chat:write`: To send messages.
+        *   `app_mentions:read`: To read messages that @mention your bot (if you want to command it outside the designated channel).
+        *   `channels:history`, `groups:history`, `im:history`, `mpim:history`: For the RTM client to receive messages in channels and DMs. Generally, scopes like `channels:read` and `groups:read` might also be needed depending on your setup. The RTM client needs to "see" messages.
+
+2.  **Get Channel ID:**
+    *   The `slack_channel_id` is the ID of the public channel where the bot will primarily listen and post. You can find this by right-clicking the channel name in Slack and selecting "Copy Link". The ID is the last part of the URL (e.g., `C1234567890`).
+
+3.  **Update Configuration File:**
+    Add the following keys to your main JSON configuration file. The `initial_capital` is used as the baseline for the portfolio value graph. If not set, it defaults to `0.0`.
+    ```json
+    {
+      // ... other configurations ...
+      "initial_capital": 1000.0, // Your starting capital in the base currency
+      "slack_token": "xoxb-your-bot-user-oauth-token-here",
+      "slack_channel_id": "C1234567890"
+      // ... other configurations ...
+    }
+    ```
+    Replace the placeholder values with your actual token, channel ID, and desired initial capital. If `slack_token` or `slack_channel_id` are missing or `null`, Slack integration will be disabled.
+
+4.  **Invite Bot to Channel:**
+    *   Don't forget to invite your bot user to the channel specified by `slack_channel_id` in Slack.
+
+### Usage
+
+Once configured and the bot is running, it will listen for commands in two ways:
+1.  Messages posted in the channel specified by `slack_channel_id`.
+2.  Direct mentions of the bot (e.g., `@YourBotName command`) in any channel the bot is a member of.
+
+**Available Commands:**
+
+*   `start`: (Currently informational) Checks if the trading bot is running. If the bot was fully stopped, this command cannot restart it from Slack due to the current application design; a manual restart of the application would be needed. It will confirm if the bot is already operational.
+*   `stop`: Stops the trading bot. The bot will finish any current processing cycle and then cease further trading activity.
+*   `status`: Reports whether the bot is currently running and displays the latest profit/loss figures.
+*   `graph`: Generates and uploads a line graph showing the portfolio value over time. The portfolio value is calculated as `Initial Capital + Cumulative Profits` from closed trades.
+*   `pnl_chart`: Generates and uploads a bar chart showing the profit or loss for each completed trade, ordered chronologically by sell time.
+
+### Troubleshooting
+
+*   **Bot Not Responding:**
+    *   Check the application logs for any error messages related to Slack initialization (e.g., "invalid token", "channel not found") or API communication issues.
+    *   Ensure the `slack_token` and `slack_channel_id` in your configuration file are correct.
+    *   Verify that the bot user has been invited to the channel specified by `slack_channel_id`.
+    *   Confirm the bot has the correct OAuth scopes/permissions in the Slack App settings.
+
 ## Disclaimer
 Trading cryptocurrencies involves significant risk. This software is provided "as is", without warranty of any kind. Use at your own risk.
 The developers are not responsible for any financial losses incurred.

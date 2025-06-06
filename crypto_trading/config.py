@@ -27,6 +27,36 @@ class Config:
             db_file_name = self.config_data['database_file']
             if not os.path.isabs(db_file_name):
                 self.database_file = os.path.join(self.dir_path, db_file_name)
+            # Slack integration settings (optional)
+            self.slack_token = self.config_dict.get('slack_token')
+            self.slack_channel_id = self.config_dict.get('slack_channel_id')
+
+            # Initial capital for portfolio graphing (optional, defaults to 0.0)
+            self.initial_capital = float(self.config_dict.get('initial_capital', 0.0))
+
+            # Database  name
+            self.pricing = 'Pricing'
+            self.db_conn = None
+        except KeyError:
+            logging.exception('error in configuration file')
+
+    def get_db_credentials_from_secrets_manager(self):
+        """Fetch DB credentials from AWS Secrets Manager."""
+        if not self.db_secret_name:
+            logging.error("DB_SECRET_NAME environment variable is not set.")
+            raise ValueError("DB_SECRET_NAME not set for RDS configuration.")
+
+        logging.info(f"Fetching DB credentials from Secrets Manager: {self.db_secret_name}")
+        client = boto3.client('secretsmanager')
+        try:
+            get_secret_value_response = client.get_secret_value(SecretId=self.db_secret_name)
+        except ClientError as e:
+            logging.error(f"Error fetching secret: {e}")
+            raise
+        else:
+            if 'SecretString' in get_secret_value_response:
+                secret = get_secret_value_response['SecretString']
+                return json.loads(secret)
             else:
                 self.database_file = db_file_name
 
