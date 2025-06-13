@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e # Exit immediately if a command exits with a non-zero status.
+
+echo "--- Starting Application Build Process ---"
+
+# APP_NAME environment variable can be passed by the CI workflow
+APP_NAME="${APP_NAME:-myapplication}"
+ARTIFACT_VERSION="${ARTIFACT_VERSION:-1.0.0}" # Can be passed by CI or determined here
+
+echo "Application: ${APP_NAME}"
+echo "Version: ${ARTIFACT_VERSION}"
+
+# 1. Simulate Compilation
+echo "[BUILD] Compiling source code..."
+# Replace with actual compilation commands (e.g., mvn package, npm run build, dotnet build)
+sleep 1
+
+# 2. Simulate Running Unit Tests
+echo "[TEST] Running unit tests..."
+# Replace with actual test commands (e.g., mvn test, npm test, dotnet test)
+sleep 1
+
+# 3. Simulate Packaging
+echo "[PACKAGE] Packaging application..."
+# Example: creating a dummy artifact file
+echo "Build artifact for ${APP_NAME} version ${ARTIFACT_VERSION}" > "${APP_NAME}-${ARTIFACT_VERSION}-artifact.txt"
+sleep 1
+
+# 4. Prepare Output Directory
+# The generic CI workflow expects artifacts in a directory named 'dist'
+OUTPUT_DIR="./dist"
+echo "[OUTPUT] Preparing output directory: ${OUTPUT_DIR}"
+mkdir -p "${OUTPUT_DIR}"
+
+# 5. Move artifact(s) to Output Directory
+# Replace with actual commands to move your packaged application (e.g., JAR, WAR, zip, binaries)
+echo "[OUTPUT] Moving artifact(s) to ${OUTPUT_DIR}..."
+mv "${APP_NAME}-${ARTIFACT_VERSION}-artifact.txt" "${OUTPUT_DIR}/"
+# If you have multiple files, move them all:
+# cp target/*.jar "${OUTPUT_DIR}/"
+# cp build/libs/*.jar "${OUTPUT_DIR}/"
+
+echo "[SUCCESS] Application build completed. Artifacts are in ${OUTPUT_DIR}"
+ls -l "${OUTPUT_DIR}"
+
+echo "--- Application Build Process Finished ---"

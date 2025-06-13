@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "functionAppName": { "type": "string" },
+    "location": { "type": "string", "defaultValue": "[resourceGroup().location]" },
+    "storageAccountName": { "type": "string" }, // Function Apps need a storage account
+    "appServicePlanId": { "type": "string" }, // Consumption or Premium plan
+    "dockerImage": { "type": "string", "defaultValue": "" }, // If custom container
+    "appSettings": { "type": "object", "defaultValue": {} }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('functionAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,linux", // Example for Linux
+      "properties": {
+        "serverFarmId": "[parameters('appServicePlanId')]",
+        "storageAccountRequired": true, // Not a direct property, but implied by functionApp definition
+        "serverFarmId": "[parameters('appServicePlanId')]",
+        "storageAccountRequired": true, // Not a direct property, but implied by functionApp definition
+        "identity": { "type": "SystemAssigned" }, // Or UserAssigned
+         "siteConfig": {
+            "appSettings": "[parameters('appSettings')]",
+            // TODO: The appSettings parameter needs to be carefully constructed by CI/CD.
+            // It must include:
+            //   - AzureWebJobsStorage (typically a Key Vault reference to the storage account connection string).
+            //   - FUNCTIONS_WORKER_RUNTIME, FUNCTIONS_EXTENSION_VERSION.
+            //   - Pointers to Azure App Configuration store (e.g., APP_CONFIG_ENDPOINT).
+            //   - Other app-specific settings, potentially as Key Vault references.
+            // Example of a Key Vault reference for AzureWebJobsStorage:
+            // {
+            //   "name": "AzureWebJobsStorage",
+            //   "value": "@Microsoft.KeyVault(VaultName=your-kv-name-from-config-pointers;SecretName=myFunctionStorageConnectionStringSecret)"
+            // }
+            // The Managed Identity of this Function App needs appropriate GET permissions on the Key Vault
+            // (identified by URI in config_pointers.yaml) and READ permissions on the App Configuration store
+            // (identified by endpoint in config_pointers.yaml).
+            // The CI/CD pipeline (e.g., promote-environment.yml) is responsible for:
+            //   a. Ensuring the Managed Identity has the correct RBAC assignments.
+            //   b. Constructing the appSettings array with these references and endpoints
+            //      based on values from the instance's config_pointers.yaml and potentially other sources.
+            "linuxFxVersion": "[if(empty(parameters('dockerImage')), 'DOTNET|6.0', concat('DOCKER|', parameters('dockerImage')))]"
+         }
+      }
+    }
+    // Define storage account resource if not pre-existing
+  ]
+}

@@ -1,0 +1,30 @@
+# Base image - choose one appropriate for your application (e.g., eclipse-temurin:17-jre-alpine, node:18-alpine, python:3.9-slim)
+FROM alpine:latest
+
+ARG APP_ARTIFACT_PATH
+ARG APP_NAME="myapplication"
+ARG APP_VERSION="1.0.0"
+
+LABEL maintainer="your-team@example.com"
+LABEL app_name="${APP_NAME}"
+LABEL app_version="${APP_VERSION}"
+
+WORKDIR /app
+
+# Copy the application artifact into the image.
+# The CI pipeline (via docker-build.sh) is expected to make the artifact available at the path specified by APP_ARTIFACT_PATH.
+COPY ${APP_ARTIFACT_PATH} /app/application_artifact
+
+# Example: If your artifact is a tar.gz file, you might extract it:
+# RUN tar -xzf /app/application_artifact -C /app/ && rm /app/application_artifact
+# Or if it's a JAR file that needs to be run:
+# ENTRYPOINT ["java", "-jar", "/app/application_artifact"]
+
+# Add other necessary files, setup users, permissions, etc.
+# For example:
+# COPY --chown=appuser:appgroup ./my-app-config.json /app/config.json
+# RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# USER appuser
+
+# Command to run the application - Replace with the actual command for your application
+CMD ["sh", "-c", "echo Hello from ${APP_NAME} v${APP_VERSION}! Artifact is at /app/application_artifact && ls -l /app"]

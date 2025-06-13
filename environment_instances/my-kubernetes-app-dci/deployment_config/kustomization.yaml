@@ -1,0 +1,13 @@
+# environment_instances/my-kubernetes-app-dci/deployment_config/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../../../apps/my-kubernetes-app/kubernetes/base
+namespace: my-kubernetes-app-dci
+patchesStrategicMerge:
+  - deployment-patch.yaml
+# ArgoCD/CI will update the image here based on version.yaml if using Kustomize image override
+# images:
+# - name: placeholder-image
+#   newName: registry/org/my-kubernetes-app # From version.yaml via CI/ArgoCD
+#   newTag: tag-from-version-yaml # From version.yaml via CI/ArgoCD

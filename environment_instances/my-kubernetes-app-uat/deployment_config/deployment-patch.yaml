@@ -1,0 +1,7 @@
+# environment_instances/my-kubernetes-app-uat/deployment_config/deployment-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-kubernetes-app-deployment
+spec:
+  replicas: 2 # UAT specific replica count

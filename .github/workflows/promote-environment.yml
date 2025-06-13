@@ -1,0 +1,287 @@
+# Workflow 2: Promote Environment
+# This workflow promotes an existing application build from a source stage
+# to a target stage by updating the GitOps repository and potentially triggering
+# deployment actions for non-Kubernetes application types.
+
+name: Promote Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_name:
+        description: 'Name of the application to promote (must match name in apps/ directory, e.g., my-kubernetes-app)'
+        required: true
+        type: string
+      source_stage:
+        description: 'The stage to promote FROM (e.g., dci, uat)'
+        required: true
+        type: string
+      target_stage:
+        description: 'The stage to promote TO (e.g., uat, ppd, prd)'
+        required: true
+        type: string
+      version_to_promote: # This can be an image_tag or an artifact_version depending on app type
+        description: 'Optional: Specific version (image_tag or artifact_version) to promote. If empty, uses the version currently in source_stage.'
+        required: false
+        type: string
+
+env:
+  APP_NAME: ${{ github.event.inputs.application_name }}
+  SOURCE_STAGE: ${{ github.event.inputs.source_stage }}
+  TARGET_STAGE: ${{ github.event.inputs.target_stage }}
+  VERSION_TO_PROMOTE: ${{ github.event.inputs.version_to_promote }}
+  # GITOPS_REPO_URL: Replace with your GitOps repository URL
+  # e.g., GITOPS_REPO_URL: git@github.com:your-org/your-gitops-repo.git
+  # Or, use a repository variable for this.
+  GITOPS_REPO_URL: "git@github.com:your-org/placeholder-gitops-repo.git" # Placeholder
+  # AZURE_CREDENTIALS_SECRET_NAME: Name of the secret containing Azure credentials.
+  # Ensure this secret is configured in GitHub repository settings.
+  AZURE_CREDENTIALS_SECRET_NAME: "AZURE_CREDENTIALS" # Consistent with BTP workflow
+
+jobs:
+  prepare_promotion_info:
+    name: Prepare Promotion Information
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag_to_promote: ${{ steps.determine_version.outputs.image_tag_to_promote }}
+      artifact_url_to_promote: ${{ steps.determine_version.outputs.artifact_url_to_promote }}
+      app_type: ${{ steps.read_app_type.outputs.app_type }}
+      target_instance_path: ${{ steps.define_paths.outputs.TARGET_INSTANCE_PATH }}
+      source_instance_path: ${{ steps.define_paths.outputs.SOURCE_INSTANCE_PATH }}
+
+    steps:
+      - name: Checkout GitOps Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO_URL }}
+          token: ${{ secrets.GITOPS_REPO_PAT }} # PAT with read/write access to GitOps repo
+          # Ensure GITOPS_REPO_PAT is created in the application repository's secrets
+
+      - name: Define Source and Target Instance Paths
+        id: define_paths
+        run: |
+          SOURCE_INSTANCE_PATH="environment_instances/${{ env.APP_NAME }}-${{ env.SOURCE_STAGE }}"
+          TARGET_INSTANCE_PATH="environment_instances/${{ env.APP_NAME }}-${{ env.TARGET_STAGE }}"
+          echo "SOURCE_INSTANCE_PATH=${SOURCE_INSTANCE_PATH}" >> $GITHUB_OUTPUT
+          echo "TARGET_INSTANCE_PATH=${TARGET_INSTANCE_PATH}" >> $GITHUB_OUTPUT
+          echo "Source Path: ${SOURCE_INSTANCE_PATH}"
+          echo "Target Path: ${TARGET_INSTANCE_PATH}"
+
+      - name: Determine Version to Promote
+        id: determine_version
+        # This step uses 'yq' to read YAML. Ensure yq is available.
+        # sudo apt-get update && sudo apt-get install -y yq
+        # Alternatively, use a Python script, sed, or other tool.
+        run: |
+          SOURCE_VERSION_FILE="${{ steps.define_paths.outputs.SOURCE_INSTANCE_PATH }}/version.yaml"
+          IMAGE_TAG_TO_PROMOTE=""
+          ARTIFACT_URL_TO_PROMOTE=""
+
+          if [[ -n "${{ env.VERSION_TO_PROMOTE }}" ]]; then
+            echo "Using provided VERSION_TO_PROMOTE: ${{ env.VERSION_TO_PROMOTE }}"
+            # Assuming VERSION_TO_PROMOTE could be an image tag or part of an artifact URL.
+            # This logic might need to be more sophisticated based on what VERSION_TO_PROMOTE represents.
+            # For now, if it contains ':', assume it's an image tag. Otherwise, assume it's related to artifact version.
+            if [[ "${{ env.VERSION_TO_PROMOTE }}" == *":"* ]]; then
+              IMAGE_TAG_TO_PROMOTE="${{ env.VERSION_TO_PROMOTE }}"
+              # If only image tag is given, artifact_url might need to be derived or might not be applicable.
+              # This is a simplification. A more robust solution might require separate inputs for image vs artifact version.
+              ARTIFACT_URL_TO_PROMOTE="derived-or-not-applicable-for-manual-image-tag" # Placeholder
+              # Try to find a matching artifact_url if source file exists
+              if [[ -f "${SOURCE_VERSION_FILE}" ]]; then
+                 # This assumes yq is installed: sudo apt-get install -y yq
+                 # This is a simple grep, yq would be better:
+                 # ARTIFACT_URL_FROM_FILE=$(yq e '.artifact_url' "${SOURCE_VERSION_FILE}")
+                 ARTIFACT_URL_FROM_FILE=$(grep 'artifact_url:' "${SOURCE_VERSION_FILE}" | awk '{print $2}')
+                 if [[ -n "$ARTIFACT_URL_FROM_FILE" ]]; then ARTIFACT_URL_TO_PROMOTE="$ARTIFACT_URL_FROM_FILE"; fi
+              fi
+            else
+              # Assuming VERSION_TO_PROMOTE is an artifact version. Construct artifact_url. Image_tag might not be applicable.
+              ARTIFACT_URL_TO_PROMOTE="placeholder-prefix/${{ env.APP_NAME }}-${{ env.VERSION_TO_PROMOTE }}.tar.gz" # Placeholder structure
+              IMAGE_TAG_TO_PROMOTE="not-applicable-for-manual-artifact-version" # Placeholder
+               if [[ -f "${SOURCE_VERSION_FILE}" ]]; then
+                 # IMAGE_TAG_FROM_FILE=$(yq e '.image_tag' "${SOURCE_VERSION_FILE}")
+                 IMAGE_TAG_FROM_FILE=$(grep 'image_tag:' "${SOURCE_VERSION_FILE}" | awk '{print $2}')
+                 if [[ -n "$IMAGE_TAG_FROM_FILE" ]]; then IMAGE_TAG_TO_PROMOTE="$IMAGE_TAG_FROM_FILE"; fi
+              fi
+            fi
+          elif [[ -f "${SOURCE_VERSION_FILE}" ]]; then
+            echo "Reading version from ${SOURCE_VERSION_FILE}"
+            # IMAGE_TAG_TO_PROMOTE=$(yq e '.image_tag' "${SOURCE_VERSION_FILE}")
+            # ARTIFACT_URL_TO_PROMOTE=$(yq e '.artifact_url' "${SOURCE_VERSION_FILE}")
+            IMAGE_TAG_TO_PROMOTE=$(grep 'image_tag:' "${SOURCE_VERSION_FILE}" | awk '{print $2}')
+            ARTIFACT_URL_TO_PROMOTE=$(grep 'artifact_url:' "${SOURCE_VERSION_FILE}" | awk '{print $2}')
+            if [[ -z "${IMAGE_TAG_TO_PROMOTE}" && -z "${ARTIFACT_URL_TO_PROMOTE}" ]]; then
+              echo "Error: Could not read version information from ${SOURCE_VERSION_FILE}."
+              exit 1
+            fi
+          else
+            echo "Error: VERSION_TO_PROMOTE not provided and ${SOURCE_VERSION_FILE} not found."
+            exit 1
+          fi
+
+          echo "Image Tag to Promote: ${IMAGE_TAG_TO_PROMOTE}"
+          echo "Artifact URL to Promote: ${ARTIFACT_URL_TO_PROMOTE}"
+          echo "image_tag_to_promote=${IMAGE_TAG_TO_PROMOTE}" >> $GITHUB_OUTPUT
+          echo "artifact_url_to_promote=${ARTIFACT_URL_TO_PROMOTE}" >> $GITHUB_OUTPUT
+
+      - name: Read Application Type
+        id: read_app_type
+        run: |
+          APP_TYPE_FILE="apps/${{ env.APP_NAME }}/type.txt"
+          if [[ ! -f "${APP_TYPE_FILE}" ]]; then
+            echo "Error: Application type file ${APP_TYPE_FILE} not found in GitOps repository."
+            exit 1
+          fi
+          APP_TYPE=$(cat "${APP_TYPE_FILE}")
+          echo "Application Type: ${APP_TYPE}"
+          echo "app_type=${APP_TYPE}" >> $GITHUB_OUTPUT
+
+      - name: Validation (Placeholder)
+        run: |
+          echo "Performing validation checks..."
+          # Placeholder for validation logic:
+          # 1. Check if promotion path is valid (e.g., dci -> uat, uat -> ppd; not prd -> dci)
+          #    Example:
+          #    if [[ "${{ env.SOURCE_STAGE }}" == "prd" && "${{ env.TARGET_STAGE }}" == "dci" ]]; then
+          #      echo "Error: Cannot promote from prd to dci."
+          #      exit 1
+          #    fi
+          # 2. (Optional) Check if source stage deployment was successful (requires status in GitOps repo)
+          echo "Validation checks placeholder complete."
+
+  approve_for_prd:
+    name: Approve for PRD Deployment
+    if: github.event.inputs.target_stage == 'prd' # Only run if target is 'prd'
+    needs: prepare_promotion_info
+    runs-on: ubuntu-latest
+    environment:
+      name: prd # This should match a GitHub Environment configured with approvers
+    steps:
+      - name: Log PRD Approval
+        run: |
+          echo "Deployment to PRD for ${{ env.APP_NAME }} has been approved."
+          echo "Image to deploy: ${{ needs.prepare_promotion_info.outputs.image_tag_to_promote }}"
+          echo "Artifact URL: ${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+
+  update_gitops_and_deploy:
+    name: Update GitOps & Trigger Deploy
+    needs: [prepare_promotion_info, approve_for_prd] # approve_for_prd is conditional itself
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO_URL }}
+          token: ${{ secrets.GITOPS_REPO_PAT }}
+
+      - name: Update version.yaml in GitOps Repo for Target Stage
+        run: |
+          TARGET_VERSION_FILE="${{ needs.prepare_promotion_info.outputs.target_instance_path }}/version.yaml"
+          echo "Updating GitOps version file for target: ${TARGET_VERSION_FILE}"
+          echo "  Image Tag: ${{ needs.prepare_promotion_info.outputs.image_tag_to_promote }}"
+          echo "  Artifact URL: ${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+
+          mkdir -p "${{ needs.prepare_promotion_info.outputs.target_instance_path }}"
+
+          # Create or update version.yaml. Using simple echo; consider yq or other tools for robustness.
+          # Ensure that an empty value for image_tag or artifact_url is handled correctly if not applicable.
+          cat <<EOL > "${TARGET_VERSION_FILE}"
+          image_tag: ${{ needs.prepare_promotion_info.outputs.image_tag_to_promote }}
+          artifact_url: ${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}
+          EOL
+          echo "Contents of ${TARGET_VERSION_FILE}:"
+          cat "${TARGET_VERSION_FILE}"
+
+      - name: Commit and Push to GitOps Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit in GitOps repository for ${{ env.APP_NAME }}-${{ env.TARGET_STAGE }}."
+          else
+            git commit -m "Promote ${{ env.APP_NAME }} from ${{ env.SOURCE_STAGE }} to ${{ env.TARGET_STAGE }}: ${{ needs.prepare_promotion_info.outputs.image_tag_to_promote || needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+            echo "Attempting to push changes to GitOps repository..."
+            git push
+            echo "Changes pushed to GitOps repository."
+          fi
+
+      - name: Deployment Triggering (Dispatch based on app_type)
+        # This section contains placeholders for deployment actions for non-Kubernetes apps.
+        # For Kubernetes, ArgoCD (or similar) handles synchronization automatically after GitOps repo update.
+        shell: bash
+        run: |
+          APP_TYPE="${{ needs.prepare_promotion_info.outputs.app_type }}"
+          echo "Application type is: ${APP_TYPE}"
+
+          if [[ "${APP_TYPE}" == "kubernetes" ]]; then
+            echo "GitOps update complete for Kubernetes app. ArgoCD (or similar) will synchronize application ${{ env.APP_NAME }}-${{ env.TARGET_STAGE }}."
+          elif [[ "${APP_TYPE}" == "webapp" ]]; then
+            echo "Placeholder: Triggering Azure WebApp deployment for ${{ env.APP_NAME }}-${{ env.TARGET_STAGE }}."
+            # TODO: Implement Azure WebApp deployment logic
+            # 1. Login to Azure:
+            #    az login --service-principal -u <appId> -p <password> --tenant <tenantId>
+            #    (Use azure/login@v1 with secrets: creds: ${{ secrets[env.AZURE_CREDENTIALS_SECRET_NAME] }})
+            # 2. Download artifact if artifact_url_to_promote is a package URL:
+            #    (e.g., curl -L -o artifact.zip "${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}")
+            # 3. Fetch deployment configurations (e.g., app settings, connection strings from deployment_config/)
+            # 4. Deploy:
+            #    azure/webapps-deploy@v2 or az webapp deploy
+            echo "  Image to use (if applicable): ${{ needs.prepare_promotion_info.outputs.image_tag_to_promote }}"
+            echo "  Artifact to deploy (if applicable): ${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+          elif [[ "${APP_TYPE}" == "functionapp" ]]; then
+            echo "Placeholder: Triggering Azure FunctionApp deployment for ${{ env.APP_NAME }}-${{ env.TARGET_STAGE }}."
+            # TODO: Implement Azure FunctionApp deployment logic
+            # 1. Login to Azure (as above)
+            # 2. Download artifact:
+            #    (e.g., curl -L -o function_app.zip "${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}")
+            # 3. Fetch deployment configurations
+            # 4. Deploy:
+            #    azure/functions-action@v1 or az functionapp deployment source config-zip
+            echo "  Artifact to deploy: ${{ needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+          else
+            echo "Warning: Unknown application type '${APP_TYPE}'. No specific deployment triggered."
+          fi
+
+      - name: Optional Post-Promotion Hook
+        if: always() # Run even if previous steps fail, to allow for cleanup or notification
+        run: |
+          if [[ -f ".cicd/post-promote.sh" ]]; then
+            echo "Executing .cicd/post-promote.sh script..."
+            sh .cicd/post-promote.sh "${{ env.APP_NAME }}" "${{ env.TARGET_STAGE }}" "${{ needs.prepare_promotion_info.outputs.image_tag_to_promote || needs.prepare_promotion_info.outputs.artifact_url_to_promote }}"
+          else
+            echo ".cicd/post-promote.sh not found, skipping."
+          fi
+
+# IMPORTANT NOTES AND ASSUMPTIONS:
+# 1. GITOPS_REPO_PAT: A GitHub Personal Access Token with write access to the GitOps repository
+#    (specified by GITOPS_REPO_URL) MUST be configured as a secret named `GITOPS_REPO_PAT`.
+# 2. AZURE_CREDENTIALS: For WebApp and FunctionApp deployments, a secret named `AZURE_CREDENTIALS`
+#    (as defined by AZURE_CREDENTIALS_SECRET_NAME) containing Azure service principal credentials
+#    in JSON format (`az ad sp create-for-rbac --sdk-auth`) must be configured.
+# 3. yq for YAML processing: The workflow uses `yq` in comments as an example for reading/writing YAML.
+#    The actual implementation uses basic `grep` and `cat` for simplicity as a placeholder.
+#    For robust YAML manipulation, install and use `yq` (e.g., `sudo apt-get install -y yq` in a step)
+#    or use a script (Python, Node.js) with a YAML library.
+# 4. Application Type (`type.txt`): The workflow reads `apps/<APP_NAME>/type.txt` from the GitOps repo
+#    to determine deployment logic. Ensure this file exists and contains `kubernetes`, `webapp`, or `functionapp`.
+# 5. version.yaml Structure: Assumes `version.yaml` in the GitOps repo contains `image_tag` and/or `artifact_url`.
+#    The logic for `VERSION_TO_PROMOTE` and deriving missing fields is a simplification and might need refinement.
+# 6. Deployment Logic for webapp/functionapp: These are placeholders. Actual Azure deployment commands
+#    (e.g., `azure/webapps-deploy@v2`, `azure/functions-action@v1`, or Azure CLI commands) need to be implemented.
+#    This includes securely logging into Azure, downloading artifacts if necessary, and applying configurations.
+# 7. GitHub Environments for PRD: The `approve_for_prd` job uses a GitHub Environment named `prd`.
+#    This environment should be configured in Repository Settings > Environments with required reviewers for protection rules.
+# 8. Custom Scripts:
+#    - `.cicd/post-promote.sh`: Optional team-provided script that can be used for notifications or other post-promotion tasks.
+# 9. Idempotency: Re-running the promotion for the same version to the same target stage should ideally be idempotent.
+#    The current GitOps update overwrites `version.yaml`, which is generally acceptable.
+# 10. Error Handling: The workflow includes basic error checks (e.g., file existence). More robust error handling
+#     should be added, especially within the deployment trigger sections and custom scripts.
+# 11. VERSION_TO_PROMOTE Handling: The logic for handling `VERSION_TO_PROMOTE` is basic. It tries to guess
+#     if it's an image tag or an artifact version. A more robust approach might involve separate inputs
+#     or clearer conventions for this input.
+# 12. Path Safety for APP_NAME: APP_NAME is used directly in paths. Ensure it's filesystem-friendly or sanitize it.
+#     The BTP workflow example included logic for this (`APP_NAME_PATH_SAFE`). This promote workflow assumes APP_NAME input is already safe.
+#

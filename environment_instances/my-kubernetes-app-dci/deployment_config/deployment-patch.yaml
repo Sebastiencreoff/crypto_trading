@@ -1,0 +1,8 @@
+# environment_instances/my-kubernetes-app-dci/deployment_config/deployment-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-kubernetes-app-deployment
+spec:
+  replicas: 1
+  # TODO: Add DCI specific patches: env vars, configmap/secret refs for Azure App Config/KV for this instance

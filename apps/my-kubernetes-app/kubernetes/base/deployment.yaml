@@ -1,0 +1,47 @@
+# apps/my-kubernetes-app/kubernetes/base/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-kubernetes-app-deployment
+spec:
+  replicas: 1 # Placeholder, can be overridden
+  selector:
+    matchLabels:
+      app: my-kubernetes-app
+  template:
+    metadata:
+      labels:
+        app: my-kubernetes-app
+    spec:
+      containers:
+      - name: my-kubernetes-app-container
+        image: placeholder-image:latest # This will be patched by Kustomize using version.yaml info
+        ports:
+        - containerPort: 8080
+        # TODO: Add readiness/liveness probes and resource requests/limits.
+        # TODO: Define volumeMounts for secrets mounted by the Key Vault CSI Driver (e.g., /mnt/secrets-store).
+        #       Example:
+        #       volumeMounts:
+        #       - name: secrets-store-inline
+        #         mountPath: "/mnt/secrets-store"
+        #         readOnly: true
+        # TODO: Ensure the pod's serviceAccountName is set and configured for AAD Workload Identity (or AAD Pod Identity)
+        #       to authenticate with Azure Key Vault via the CSI Driver.
+        # TODO: If using the Azure App Configuration Kubernetes Provider, ensure necessary labels/annotations
+        #       are on the pod or namespace, and the provider is configured to use the endpoint from config_pointers.yaml.
+        #       Alternatively, provide App Config endpoint as an environment variable for SDK access.
+        env:
+        - name: AZURE_APPCONFIG_ENDPOINT # Example if using SDK directly
+          valueFrom:
+            configMapKeyRef: # This ConfigMap would be created/updated based on config_pointers.yaml by a CI/CD step or a K8s controller
+              name: my-kubernetes-app-dci-appconfig-pointer # Example name, should be instance specific
+              key: endpoint
+      # TODO: Define volumes for CSI Key Vault integration.
+      #       Example:
+      #       volumes:
+      #       - name: secrets-store-inline
+      #         csi:
+      #           driver: secrets-store.csi.k8s.io
+      #           readOnly: true
+      #           volumeAttributes:
+      #             secretProviderClass: "azure-kvname-my-app-dci" # Name of your SecretProviderClass CRD

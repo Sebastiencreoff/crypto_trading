@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "webAppName": { "value": "my-webapp-dci-instance" },
+    "appServicePlanId": { "value": "/subscriptions/YOUR_SUB/resourceGroups/YOUR_RG/providers/Microsoft.Web/serverfarms/YourDCIAppServicePlan" },
+    "dockerImage": { "value": "" }, // Will be populated by CI from version.yaml if it's a container app
+    "appSettings": { // These would ideally reference Key Vault or App Config via config_pointers.yaml
+        "value": [
+            { "name": "APP_ENVIRONMENT", "value": "DCI" },
+            { "name": "API_ENDPOINT", "value": "http://dci-api.example.com" },
+            { "name": "AzureAppConfigurationEndpoint", "value": "value-from-config_pointers-yaml" },
+            { "name": "AzureKeyVaultEndpoint", "value": "value-from-config_pointers-yaml" }
+        ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+azure_app_config_store: your-funcapp-appconfig-dci
+azure_key_vault_uri: your-funcapp-kv-dci

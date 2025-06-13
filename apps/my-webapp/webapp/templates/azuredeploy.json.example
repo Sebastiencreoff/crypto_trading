@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "webAppName": { "type": "string" },
+    "location": { "type": "string", "defaultValue": "[resourceGroup().location]" },
+    "appServicePlanId": { "type": "string" },
+    "dockerImage": { "type": "string", "defaultValue": "" },
+    "appSettings": { "type": "object", "defaultValue": {} }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('webAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "dependsOn": [],
+      "properties": {
+        "serverFarmId": "[parameters('appServicePlanId')]",
+        "serverFarmId": "[parameters('appServicePlanId')]",
+        "identity": { "type": "SystemAssigned" }, // Or UserAssigned with userAssignedIdentities property
+        "siteConfig": {
+           "linuxFxVersion": "[if(empty(parameters('dockerImage')), 'DOTNETCORE|6.0', concat('DOCKER|', parameters('dockerImage')))]",
+           "appSettings": "[parameters('appSettings')]"
+           // TODO: The appSettings parameter should be constructed by the CI/deployment script.
+           // It should include:
+           // 1. Pointers to Azure App Configuration store (e.g., an app setting like 'APP_CONFIG_ENDPOINT').
+           //    The value for this would come from config_pointers.yaml for the specific instance.
+           // 2. Key Vault references for secrets. These are app settings with a special format:
+           //    MY_SECRET_SETTING_NAME="@Microsoft.KeyVault(VaultName=your-kv-name-from-config-pointers;SecretName=myActualSecretName)"
+           //    or MY_SECRET_SETTING_NAME="@Microsoft.KeyVault(SecretUri=uri-to-secret-version-from-kv)"
+           // The Managed Identity of this WebApp (defined above) needs appropriate GET permissions on the Key Vault
+           // (identified by URI in config_pointers.yaml) and READ permissions on the App Configuration store
+           // (identified by endpoint in config_pointers.yaml).
+           // The CI/CD pipeline (e.g., promote-environment.yml) is responsible for:
+           //   a. Ensuring the Managed Identity has the correct RBAC assignments to these services.
+           //   b. Constructing the appSettings array with these Key Vault references and App Config endpoint(s)
+           //      based on the values found in the instance's config_pointers.yaml.
+        }
+      }
+    }
+  ]
+}
