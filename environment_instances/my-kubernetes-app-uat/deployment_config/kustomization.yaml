@@ -1,0 +1,8 @@
+# environment_instances/my-kubernetes-app-uat/deployment_config/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../../../apps/my-kubernetes-app/kubernetes/base
+namespace: my-kubernetes-app-uat
+patchesStrategicMerge:
+  - deployment-patch.yaml

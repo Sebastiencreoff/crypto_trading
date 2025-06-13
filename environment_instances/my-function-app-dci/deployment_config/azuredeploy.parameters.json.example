@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "functionAppName": { "value": "my-function-app-dci-instance" },
+    "storageAccountName": { "value": "yourdcifunctionstorage" },
+    "appServicePlanId": { "value": "/subscriptions/YOUR_SUB/resourceGroups/YOUR_RG/providers/Microsoft.Web/serverfarms/YourDCIFunctionAppServicePlan" },
+    "dockerImage": { "value": "" }, // From version.yaml if container
+    "appSettings": {
+        "value": [
+            { "name": "APP_ENVIRONMENT", "value": "DCI" },
+            { "name": "AzureWebJobsStorage", "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccountName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2021-04-01').keys[0].value)]" },
+            { "name": "FUNCTIONS_WORKER_RUNTIME", "value": "dotnet" }, // Example: dotnet, node, python, java, powershell
+            { "name": "AzureAppConfigurationEndpoint", "value": "value-from-config_pointers-yaml" },
+            { "name": "AzureKeyVaultEndpoint", "value": "value-from-config_pointers-yaml" }
+        ]
+    }
+  }
+}

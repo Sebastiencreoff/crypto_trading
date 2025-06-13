@@ -1,0 +1,92 @@
+#!/bin/bash
+set -e # Exit immediately if a command exits with a non-zero status.
+
+echo "--- Starting Docker Image Build Process ---"
+
+# Arguments expected from the CI pipeline:
+# 1. ARTIFACT_INFO: URL or local path to the application artifact.
+# 2. APP_NAME: Name of the application.
+# 3. APP_VERSION: Version of the application.
+# 4. GIT_HASH: Short Git commit hash.
+# 5. DOCKER_REGISTRY_PREFIX: e.g., your-registry/your-org or ghcr.io/your-username
+
+ARTIFACT_INFO="${1:?Artifact information (URL or path) is required}"
+APP_NAME="${2:?Application name is required}"
+APP_VERSION="${3:?Application version is required}"
+GIT_HASH="${4:?Git hash is required}"
+DOCKER_REGISTRY_PREFIX="${5:-your-registry/your-org}" # Default if not provided
+
+LOCAL_ARTIFACT_PATH="./downloaded_artifact"
+DOCKERFILE_PATH="./Dockerfile" # Assume Dockerfile is in the root of the app repo, or provide path.
+
+echo "Application: ${APP_NAME}"
+echo "Version: ${APP_VERSION}"
+echo "Git Hash: ${GIT_HASH}"
+echo "Artifact Info: ${ARTIFACT_INFO}"
+echo "Docker Registry Prefix: ${DOCKER_REGISTRY_PREFIX}"
+echo "Dockerfile: ${DOCKERFILE_PATH}"
+
+# 1. Prepare Artifact
+# If ARTIFACT_INFO is a URL, download it. Otherwise, assume it's a local path.
+if [[ "${ARTIFACT_INFO}" == http* ]]; then
+  echo "[DOWNLOAD] Downloading artifact from ${ARTIFACT_INFO} to ${LOCAL_ARTIFACT_PATH}..."
+  # Add curl or wget command here, e.g.:
+  # curl -L -o "${LOCAL_ARTIFACT_PATH}" "${ARTIFACT_INFO}"
+  # For this example, we'll just create a dummy file if it's a URL
+  echo "Dummy content from URL" > "${LOCAL_ARTIFACT_PATH}"
+else
+  echo "[COPY] Using local artifact path: ${ARTIFACT_INFO}"
+  # If it's already local (e.g., from a previous CI step), ensure it's at LOCAL_ARTIFACT_PATH
+  # cp "${ARTIFACT_INFO}" "${LOCAL_ARTIFACT_PATH}"
+  # For this example, assume ARTIFACT_INFO is the path and copy it or link it
+  if [ -f "${ARTIFACT_INFO}" ]; then
+    cp "${ARTIFACT_INFO}" "${LOCAL_ARTIFACT_PATH}"
+  else
+    echo "Warning: Local artifact path ${ARTIFACT_INFO} not found. Creating dummy."
+    echo "Dummy local content" > "${LOCAL_ARTIFACT_PATH}"
+  fi
+fi
+
+if [ ! -f "${LOCAL_ARTIFACT_PATH}" ]; then
+    echo "Error: Artifact file ${LOCAL_ARTIFACT_PATH} not found after download/copy attempt."
+    exit 1
+fi
+echo "Artifact prepared at: ${LOCAL_ARTIFACT_PATH}"
+ls -l "${LOCAL_ARTIFACT_PATH}"
+
+# 2. Define Image Tag
+IMAGE_TAG="${DOCKER_REGISTRY_PREFIX}/${APP_NAME}:${APP_VERSION}-${GIT_HASH}"
+LATEST_IMAGE_TAG="${DOCKER_REGISTRY_PREFIX}/${APP_NAME}:latest" # Optional: for a 'latest' tag
+
+echo "[BUILD] Building Docker image with tag: ${IMAGE_TAG}"
+if [ -f "${DOCKERFILE_PATH}" ]; then
+  docker build \
+    --build-arg APP_ARTIFACT_PATH="${LOCAL_ARTIFACT_PATH}" \
+    --build-arg APP_NAME="${APP_NAME}" \
+    --build-arg APP_VERSION="${APP_VERSION}" \
+    -t "${IMAGE_TAG}" \
+    -f "${DOCKERFILE_PATH}" .
+else
+    echo "Error: Dockerfile not found at ${DOCKERFILE_PATH}. Cannot build image."
+    # As a fallback for the example, create a minimal Dockerfile if one doesn't exist
+    echo "Creating a minimal fallback Dockerfile as ${DOCKERFILE_PATH} was not found."
+    cat > "${DOCKERFILE_PATH}" <<EOF
+FROM alpine:latest
+ARG APP_ARTIFACT_PATH
+ARG APP_NAME
+WORKDIR /app
+COPY \${APP_ARTIFACT_PATH} /app/artifact
+CMD echo "Fallback Docker image for \${APP_NAME}. Artifact at /app/artifact." && ls /app
+EOF
+    docker build --build-arg APP_ARTIFACT_PATH="${LOCAL_ARTIFACT_PATH}" --build-arg APP_NAME="${APP_NAME}" -t "${IMAGE_TAG}" -f "${DOCKERFILE_PATH}" .
+fi
+
+
+# Optionally, tag as latest
+# echo "[TAG] Optionally tagging ${IMAGE_TAG} as ${LATEST_IMAGE_TAG}"
+# docker tag "${IMAGE_TAG}" "${LATEST_IMAGE_TAG}"
+
+echo "[SUCCESS] Docker image build completed: ${IMAGE_TAG}"
+# The CI pipeline will be responsible for pushing this image tag.
+
+echo "--- Docker Image Build Process Finished ---"

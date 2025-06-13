@@ -1,0 +1,2 @@
+azure_app_config_store: your-appconfig-store-uat
+azure_key_vault_uri: your-kv-uri-uat

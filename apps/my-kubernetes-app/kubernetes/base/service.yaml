@@ -1,0 +1,13 @@
+# apps/my-kubernetes-app/kubernetes/base/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-kubernetes-app-service
+spec:
+  selector:
+    app: my-kubernetes-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

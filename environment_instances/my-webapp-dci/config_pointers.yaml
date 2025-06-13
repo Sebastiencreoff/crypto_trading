@@ -1,0 +1,2 @@
+azure_app_config_store: your-webapp-appconfig-dci
+azure_key_vault_uri: your-webapp-kv-dci
